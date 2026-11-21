@@ -35,20 +35,20 @@ import { SAMPLE_BOARD, SAMPLE_BOARD_ID } from "@/features/designs/sample-board";
 import { anchorBox, faceVariables, type Box, type FaceOverlayLayout } from "@/render/face";
 import { t } from "@/i18n";
 import { copyElements, shortcutAction, useClipboard, type FaceAction } from "./actions";
-import { alignDeltas, type AlignOp } from "./align";
-import { DocumentKeys } from "./DocumentKeys";
+import { alignDeltas, type AlignOp } from "@/components/editor/align";
+import { DocumentKeys } from "@/components/editor/DocumentKeys";
 import { extremeOrder, moveElement, stepOrder } from "./edit";
 import { ElementProperties, type ElementPatch } from "./ElementProperties";
 import { FaceCanvas } from "./FaceCanvas";
 import { FaceContextMenu } from "./FaceContextMenu";
 import { FaceProperties } from "./FaceProperties";
-import { ELEMENT_KINDS, KIND_ICONS, newElement, previewBoard, variableLabel } from "./faces";
-import { useHistory } from "./history";
-import { LayersPanel } from "./LayersPanel";
+import { ELEMENT_KINDS, KIND_ICONS, layerLabel, newElement, previewBoard, variableLabel } from "./faces";
+import { useHistory } from "@/components/editor/history";
+import { LayersPanel } from "@/components/editor/LayersPanel";
 import { NewFaceDialog } from "./NewFaceDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { GRID_STEPS, loadView, saveView, type FaceView } from "./view";
-import { typing, zoomStep } from "./zoom";
+import { typing, zoomStep } from "@/components/editor/zoom";
 
 /** Hodnoty premennych v nahlade, kym ich obsluha nezmeni. */
 const SAMPLE_VALUES: Record<string, string> = { track: "1", platform: "2", station: "STANICA", direction: "SEVER" };
@@ -438,7 +438,8 @@ export function FacesPage() {
           <section className="flex min-h-0 flex-1 flex-col gap-2">
             <h2 className="text-xs font-medium text-muted-foreground">{t("faces.layers")}</h2>
             <LayersPanel
-              elements={form.elements}
+              elements={form.elements.map((e) => ({ label: layerLabel(e), icon: KIND_ICONS[e.kind], locked: e.locked }))}
+              empty={t("faces.layers.empty")}
               selection={chosen}
               hidden={hidden}
               readOnly={readOnly}

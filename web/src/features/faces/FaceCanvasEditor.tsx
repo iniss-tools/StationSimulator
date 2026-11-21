@@ -10,11 +10,11 @@ import type { BoardFaceDto, FaceElementDto } from "@/api";
 import { cn } from "@/lib/utils";
 import { anchorBox, type Box, type FaceOverlayLayout } from "@/render/face";
 import { t } from "@/i18n";
-import { intersecting, union } from "./align";
+import { intersecting, union } from "@/components/editor/align";
 import { COARSE, FINE, freeEdges, moveElement, referencePoint, resizeElement, SNAP, type DragMode } from "./edit";
 import { elementLabel } from "./faces";
-import { measure } from "./measure";
-import { snapEdge, snapMove, targetsOf, type Gap, type Guide, type SnapOptions, type SnapTargets } from "./snap";
+import { measure } from "@/components/editor/measure";
+import { snapEdge, snapMove, targetsOf, type Gap, type Guide, type SnapOptions, type SnapTargets } from "@/components/editor/snap";
 import type { FaceView } from "./view";
 
 /** Najmensi obrys v CSS px, aby sa dal chytit aj tenky prvok. */

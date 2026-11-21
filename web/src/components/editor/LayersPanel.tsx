@@ -1,15 +1,23 @@
-// Vrstvy cela (ako vo Figme): prvky od vrchneho (kresli sa posledny) po spodny, vyber (Ctrl+klik pridava, Shift+klik
+// Vrstvy editora platna (ako vo Figme): prvky od vrchneho (kresli sa posledny) po spodny, vyber (Ctrl+klik pridava, Shift+klik
 // vyberie rozsah), zamok, skrytie v editore
 // a zmena poradia tahanim. Vybrany prvok sa posunie do pohladu len v zozname, stranka sa neposuva.
 import { useEffect, useRef, useState, type DragEvent } from "react";
-import { Eye, EyeOff, Lock, LockOpen } from "lucide-react";
-import type { FaceElementDto } from "@/api";
+import { Eye, EyeOff, Lock, LockOpen, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
-import { KIND_ICONS, layerLabel } from "./faces";
+
+/** Vrstva v zozname: popis, ikona druhu a zamok. */
+export interface Layer {
+  label: string;
+  icon: LucideIcon;
+  locked: boolean;
+}
 
 interface Props {
-  elements: FaceElementDto[];
+  /** Vrstvy v poradi kreslenia (prva je naspodku). */
+  elements: Layer[];
+  /** Text prazdneho zoznamu. */
+  empty: string;
   selection: number[];
   hidden: ReadonlySet<number>;
   readOnly: boolean;
@@ -27,7 +35,7 @@ interface Drop {
   after: boolean;
 }
 
-export function LayersPanel({ elements, selection, hidden, readOnly, onSelect, onToggleLock, onToggleHidden, onReorder }: Props) {
+export function LayersPanel({ elements, empty, selection, hidden, readOnly, onSelect, onToggleLock, onToggleHidden, onReorder }: Props) {
   const list = useRef<HTMLUListElement>(null);
   const rows = useRef(new Map<number, HTMLLIElement>());
   const [dragged, setDragged] = useState<number | null>(null);
@@ -66,13 +74,13 @@ export function LayersPanel({ elements, selection, hidden, readOnly, onSelect, o
     setDrop(null);
   };
 
-  if (elements.length === 0) return <p className="text-sm text-muted-foreground">{t("faces.layers.empty")}</p>;
+  if (elements.length === 0) return <p className="text-sm text-muted-foreground">{empty}</p>;
 
   return (
     <ul ref={list} aria-label={t("faces.layers")} className="relative -mx-1 min-h-0 flex-1 overflow-y-auto">
       {shown.map((index, row) => {
         const element = elements[index];
-        const Icon = KIND_ICONS[element.kind];
+        const Icon = element.icon;
         const isHidden = hidden.has(index);
         return (
           <li
@@ -113,7 +121,7 @@ export function LayersPanel({ elements, selection, hidden, readOnly, onSelect, o
               onClick={(e) => onSelect(index, e.ctrlKey || e.metaKey ? "toggle" : e.shiftKey ? "range" : "replace")}
             >
               <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">{layerLabel(element)}</span>
+              <span className="truncate">{element.label}</span>
             </button>
             <button
               type="button"

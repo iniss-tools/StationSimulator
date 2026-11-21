@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
 import { FaceCanvasEditor } from "./FaceCanvasEditor";
 import type { FaceView } from "./view";
-import { typing, zoomStep } from "./zoom";
+import { typing, zoomStep } from "@/components/editor/zoom";
 
 interface Props {
   board: BoardDto;

@@ -29,9 +29,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { FACE_SYMBOLS } from "@/render/face";
 import { t, type TextKey } from "@/i18n";
-import { ALIGN_OPS, canAlign, type AlignOp } from "./align";
+import { ALIGN_OPS, canAlign, type AlignOp } from "@/components/editor/align";
 import { elementSummary, IMAGE_TYPES, KIND_ICONS, readImage } from "./faces";
-import { ColorField, NumberField, PanelSection } from "./fields";
+import { NumberField, PanelSection } from "@/components/editor/fields";
+import { ColorField } from "./fields";
 
 const ANCHORS: FaceAnchor[] = ["face", "matrix", "row", "top", "bottom", "left", "right"];
 const ALIGNS: FaceAlign[] = ["left", "center", "right"];

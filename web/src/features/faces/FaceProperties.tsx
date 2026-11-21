@@ -6,7 +6,7 @@ import { StatusBadge } from "@/components/common/status-badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { t } from "@/i18n";
-import { PanelSection } from "./fields";
+import { PanelSection } from "@/components/editor/fields";
 
 const int = (value: string) => Number.parseInt(value, 10) || 0;
 

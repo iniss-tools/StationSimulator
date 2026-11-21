@@ -1,4 +1,4 @@
-// Mierka platna editora ciel a klavesove skratky mimo poli formulara.
+// Mierka platna editora (cela tabul, schema stanice) a klavesove skratky mimo poli formulara.
 
 /** Najmensia a najvacsia mierka (CSS px na px prirodzenej velkosti tabule). */
 export const MIN_ZOOM = 0.1;
