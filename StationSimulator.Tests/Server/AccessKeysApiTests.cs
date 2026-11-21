@@ -8,6 +8,7 @@ using StationSimulator.Contracts.Audit;
 using StationSimulator.Contracts.Auth;
 using StationSimulator.Contracts.Keys;
 using StationSimulator.Contracts.Lines;
+using StationSimulator.Contracts.Schemas;
 
 namespace StationSimulator.Tests.Server;
 
@@ -112,6 +113,25 @@ public sealed class AccessKeysApiTests
         admin.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", "ts_neplatny");
 
         Assert.AreEqual(HttpStatusCode.Unauthorized, (await admin.GetAsync("/api/state")).StatusCode);
+    }
+
+    [TestMethod]
+    public async Task ObrazokPozadiaSchemy_KlucVParametri()
+    {
+        var (server, admin) = await StartWithAdmin();
+        await using var _ = server;
+        var device = await Create(admin, "Kiosk", AccessKeyKind.Device, Roles.Viewer);
+        var created = await admin.PostAsJsonAsync("/api/schemas", new StationSchemaRequest("Hala", 800, 400, []));
+        var id = (await created.Content.ReadFromJsonAsync<StationSchemaDto>())!.Id;
+        var image = new ByteArrayContent([1, 2, 3]);
+        Assert.AreEqual(HttpStatusCode.OK, (await admin.PutAsync($"/api/schemas/{id}/background?name=plan.png", image)).StatusCode);
+
+        // obrazok nacita prehliadac bez hlavicky - kluc v adrese plati len pre citanie obrazka
+        using var anonymous = server.Client(csrfHeader: false);
+        Assert.AreEqual(HttpStatusCode.OK, (await anonymous.GetAsync($"/api/schemas/{id}/background?access_token={device.Secret}")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/schemas/{id}/background")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anonymous.GetAsync($"/api/schemas?access_token={device.Secret}")).StatusCode);
+        Assert.AreEqual(HttpStatusCode.Unauthorized, (await anonymous.DeleteAsync($"/api/schemas/{id}/background?access_token={device.Secret}")).StatusCode);
     }
 
     [TestMethod]

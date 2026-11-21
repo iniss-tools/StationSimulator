@@ -30,6 +30,9 @@ public static class Permissions
     /// <summary>Scenare poruch: upravit, spustit, zastavit.</summary>
     public const string ScenariosManage = "scenarios.manage";
 
+    /// <summary>Schemy stanice: zalozit, upravit, zmazat.</summary>
+    public const string SchemasManage = "schemas.manage";
+
     /// <summary>Vlastne vzhlady tabul.</summary>
     public const string DesignsManage = "designs.manage";
 
@@ -57,7 +60,7 @@ public static class Permissions
     /// <summary>Vsetky opravnenia.</summary>
     public static IReadOnlyList<string> All { get; } =
     [
-        SimulatorView, LogView, ArchiveView, StatisticsView, AuditView, LinesManage, BoardsControl, ScenariosManage, DesignsManage, RecordingsManage,
-        VirtualManage, SignageManage, SettingsManage, ServerManage, UsersManage, KeysManage
+        SimulatorView, LogView, ArchiveView, StatisticsView, AuditView, LinesManage, BoardsControl, ScenariosManage, SchemasManage, DesignsManage,
+        RecordingsManage, VirtualManage, SignageManage, SettingsManage, ServerManage, UsersManage, KeysManage
     ];
 }

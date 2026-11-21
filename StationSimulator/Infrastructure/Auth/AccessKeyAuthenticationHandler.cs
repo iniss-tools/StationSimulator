@@ -39,11 +39,17 @@ public sealed class AccessKeyAuthenticationHandler(
         var header = request.Headers.Authorization.ToString();
         if (header.StartsWith(Bearer, StringComparison.OrdinalIgnoreCase))
             return header[Bearer.Length..].Trim();
-        // WebSocket a obrazky/videa sprav panelov prehliadac nacita bez hlavicky
-        return (request.Path.StartsWithSegments("/ws") || request.Path.StartsWithSegments("/api/signage/media")) && request.Query[QueryParameter] is { Count: > 0 } query
+        // WebSocket, obrazky/videa sprav panelov a obrazok pozadia schemy prehliadac nacita bez hlavicky
+        return (request.Path.StartsWithSegments("/ws") || request.Path.StartsWithSegments("/api/signage/media") || IsSchemaBackground(request))
+               && request.Query[QueryParameter] is { Count: > 0 } query
             ? query[0]
             : null;
     }
+
+    /// <summary>GET /api/schemas/{id}/background - obrazok kresli stranka kiosku ako <c>&lt;image&gt;</c>.</summary>
+    private static bool IsSchemaBackground(HttpRequest request) =>
+        HttpMethods.IsGet(request.Method) && request.Path.StartsWithSegments("/api/schemas", out var rest)
+                                         && rest.Value?.EndsWith("/background", StringComparison.Ordinal) == true;
 
     protected override async Task<AuthenticateResult> HandleAuthenticateAsync()
     {

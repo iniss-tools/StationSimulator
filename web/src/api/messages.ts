@@ -20,6 +20,8 @@ export type LiveMessage =
   | { type: "signage" }
   /** Zmenili sa scenare porucha alebo ich beh. */
   | { type: "scenarios" }
+  /** Zmenili sa schemy stanice. */
+  | { type: "schemas" }
   /** Zmenili sa vlastne predlohy ciel tabul. */
   | { type: "faces" }
   /** Pribudli hlasenia v sledovanom archive hlaseni (monitor); reset = sleduje sa iny subor, nacitat znova. */

@@ -33,6 +33,17 @@ public sealed class PwaApiTests
     }
 
     [TestMethod]
+    public async Task Manifest_KioskSchemyStanice()
+    {
+        await using var server = SimulatorServer.Start();
+        var response = await server.Client().GetAsync("/api/manifest?view=%2Fplan%2F2&name=Stanica");
+
+        Assert.AreEqual(HttpStatusCode.OK, response.StatusCode);
+        using var json = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.AreEqual("/?view=%2Fplan%2F2", json.RootElement.GetProperty("id").GetString());
+    }
+
+    [TestMethod]
     [DataRow("%2Fusers", "pwa.view")]
     [DataRow("https%3A%2F%2Fexample.com", "pwa.view")]
     [DataRow("%2Fwall&key=zly", "pwa.key")]

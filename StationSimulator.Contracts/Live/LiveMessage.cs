@@ -19,4 +19,5 @@ namespace StationSimulator.Contracts.Live;
 [JsonDerivedType(typeof(ScenariosMessage), "scenarios")]
 [JsonDerivedType(typeof(ReportsMessage), "reports")]
 [JsonDerivedType(typeof(FacesMessage), "faces")]
+[JsonDerivedType(typeof(SchemasMessage), "schemas")]
 public abstract record LiveMessage;

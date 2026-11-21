@@ -5,6 +5,7 @@ using StationSimulator.Application.Faces;
 using StationSimulator.Application.Keys;
 using StationSimulator.Application.OAuth;
 using StationSimulator.Application.Scenarios;
+using StationSimulator.Application.Schemas;
 using StationSimulator.Application.Signage;
 using StationSimulator.Application.Statistics;
 using StationSimulator.Application.Virtual;
@@ -80,6 +81,10 @@ public abstract class AppDbContext(DbContextOptions options) : IdentityDbContext
 
     /// <summary>Scenare porucha.</summary>
     public DbSet<FaultScenarioRecord> FaultScenarios => Set<FaultScenarioRecord>();
+
+    public DbSet<StationSchemaRecord> StationSchemas => Set<StationSchemaRecord>();
+
+    public DbSet<StationSchemaBackgroundRecord> StationSchemaBackgrounds => Set<StationSchemaBackgroundRecord>();
 
     /// <summary>Historia ustredni AK Signal - zmeny stavu svetla.</summary>
     public DbSet<Application.Devices.LightStateRecord> DeviceLightStates => Set<Application.Devices.LightStateRecord>();
@@ -262,6 +267,23 @@ public abstract class AppDbContext(DbContextOptions options) : IdentityDbContext
             scenario.HasKey(s => s.Id);
             scenario.Property(s => s.Id).ValueGeneratedOnAdd();
             scenario.Property(s => s.Name).HasMaxLength(100);
+        });
+        // prvky schemy su JSON ako v API - schem je malo a citaju sa vzdy cele
+        builder.Entity<StationSchemaRecord>(schema =>
+        {
+            schema.ToTable("StationSchemas");
+            schema.HasKey(s => s.Id);
+            schema.Property(s => s.Id).ValueGeneratedOnAdd();
+            schema.Property(s => s.Name).HasMaxLength(100);
+        });
+        builder.Entity<StationSchemaBackgroundRecord>(background =>
+        {
+            background.ToTable("StationSchemaBackgrounds");
+            background.HasKey(b => b.SchemaId);
+            background.Property(b => b.SchemaId).ValueGeneratedNever();
+            background.Property(b => b.ContentType).HasMaxLength(50);
+            background.Property(b => b.Version).HasMaxLength(32);
+            background.HasOne<StationSchemaRecord>().WithOne().HasForeignKey<StationSchemaBackgroundRecord>(b => b.SchemaId).OnDelete(DeleteBehavior.Cascade);
         });
         // obsah sprav, playlistov a skupin je JSON ako v API - je ich malo a citaju sa vzdy vsetky
         builder.Entity<SignageMessageRecord>(message =>

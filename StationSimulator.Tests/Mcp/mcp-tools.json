@@ -7367,6 +7367,162 @@
       }
     },
     {
+      "name": "get_schema",
+      "title": "Station schema",
+      "description": "One station schema with all elements in drawing order (later elements cover earlier ones). A device element points to a simulator device by line and address (board id is line-address) and, for a light or audio circuit, by the circuit name; its live state comes from get_board, get_aksignal or get_state.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Schema number from list_schemas.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "track",
+                    "platform",
+                    "building",
+                    "area",
+                    "path",
+                    "text",
+                    "board",
+                    "audio",
+                    "light",
+                    "amplifier",
+                    "commLine"
+                  ]
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                },
+                "rotation": {
+                  "type": "number"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                },
+                "text": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "fill": {
+                  "type": "string"
+                },
+                "stroke": {
+                  "type": "number"
+                },
+                "line": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "circuit": {
+                  "type": "string"
+                },
+                "view": {
+                  "type": "string",
+                  "enum": [
+                    "live",
+                    "symbol"
+                  ]
+                },
+                "locked": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "background": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backgroundOpacity": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "width",
+          "height",
+          "elements"
+        ]
+      },
+      "annotations": {
+        "title": "Station schema",
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
       "name": "get_status",
       "title": "Simulator status",
       "description": "Overview of the simulator: every line with its connection status, last message time and traffic counters, the number of boards per line, and boards with a problem (simulated fault, power outage, or INISS sending messages meant for another manufacturer).",
@@ -9103,6 +9259,74 @@
       },
       "annotations": {
         "title": "Fault scenarios",
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": true
+      }
+    },
+    {
+      "name": "list_schemas",
+      "title": "Station schemas",
+      "description": "Station schemas: plans of the station with drawing elements and the simulator devices placed on them. Use get_schema for the elements.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "schemas": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "description": "Schema number.",
+                  "type": "integer"
+                },
+                "name": {
+                  "description": "Schema name.",
+                  "type": "string"
+                },
+                "width": {
+                  "description": "Canvas width in canvas units.",
+                  "type": "integer"
+                },
+                "height": {
+                  "description": "Canvas height in canvas units.",
+                  "type": "integer"
+                },
+                "drawings": {
+                  "description": "Number of drawing elements (tracks, platforms, buildings, areas, paths, texts).",
+                  "type": "integer"
+                },
+                "devices": {
+                  "description": "Number of device elements (boards, audio and light circuits, amplifiers, line states).",
+                  "type": "integer"
+                },
+                "hasBackground": {
+                  "description": "The schema has a background image.",
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "width",
+                "height",
+                "drawings",
+                "devices",
+                "hasBackground"
+              ]
+            }
+          }
+        },
+        "required": [
+          "schemas"
+        ]
+      },
+      "annotations": {
+        "title": "Station schemas",
         "idempotentHint": true,
         "openWorldHint": false,
         "readOnlyHint": true

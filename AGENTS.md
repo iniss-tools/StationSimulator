@@ -88,6 +88,11 @@ a vlastným `JsonConverter`, správy `/ws` polymorfné cez `type`. Používa ich
     INISS 3.39 `Iniss339SoundLengths` (kľúče z `FYZBANK.DAT`/`FYZZVUK.DAT` vedľa programu). `SoundBanks` drží banku
     programu v nastavení pre `DeviceClock` aj `GET /api/sounds` (nahrávka ako WAV na prehratie v prehliadači, len
     súbory v banke, skrátený blok dát opraví `WavHeader`).
+- `Schemas/` – schémy stanice (kresba stanice a zariadenia na plátne) v DB ako JSON požiadavky. Zariadenie sa viaže
+  na linku a adresu, okruh ústredne na názov (`SchemaElementDto.Circuit`); živý stav si web berie zo stavu simulátora.
+  Obrázok pozadia je v samostatnej tabuľke (`StationSchemaBackgroundRecord`, najviac 8 MB), nahráva sa zvlášť
+  a zoznam schém nesie len jeho verziu; krytie je v definícii schémy.
+  Kiosk `#/plan/N` číta obrázok s kľúčom v `access_token`; export a import schémy robí web (`schema-transfer.ts`).
 - `Scenarios/ScenarioRunner` – zlúči účinky bežiacich scenárov a mení len rozdiely, pôvodné poruchy vráti.
 - `Signage/` – informačné panely ako INISSView 2 (len Application, Persistence a web): čistý rozvrh
   `SignageSchedule`, správy, playlisty a skupiny v DB ako JSON požiadavky, `SignagePanelTracker` v pamäti, súbory
@@ -216,9 +221,15 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   `accessor` pamätá, kým sa nezmenia dáta), dlhý zoznam virtualizovať (`@tanstack/react-virtual`).
 - Rozhranie shadcn/ui (Base UI, preset nova, ikony lucide) v `src/components/ui` – kód je náš, texty cez `t()`;
   Tailwind v4, tokeny v `src/index.css`; CSS modul len pre vzhľad určený dátami.
-- Editor čiel `features/faces` – čisté moduly `faces/*.ts` (úpravy, história, prichytávanie, zarovnanie, meranie),
+- Editor čiel `features/faces` – čisté moduly `faces/*.ts` (úpravy prvkov čela) a spoločné z `components/editor`,
   príkazy z klávesov aj ponuky cez `faces/actions.ts`. Klávesy stránky `DocumentKeys` (posluchač s aktuálnou
   obsluhou, nie efekt pred skorým návratom); ťahanie za popis poľa `NumberField` = jeden krok histórie.
+- Schéma stanice `features/schema` – stav prvku z živého stavu simulátora počíta čistý `schema.ts` (`elementState`,
+  návrh rozmiestnenia `autoLayout`). Plátno `SchemaCanvas` kreslí kresbu a značky v SVG, živý obsah tabúľ je vrstva
+  `BoardView` nad ním s polohou v percentách plátna. Editor `SchemaEditor` (čisté úpravy `schema-edit.ts`, plátno
+  s ťahaním `SchemaEditCanvas`) ukladá až tlačidlom Uložiť.
+- Spoločné časti editorov plátna (čelá, schéma) sú v `src/components/editor`: história, prichytávanie, zarovnanie,
+  poradie, kroky, skratky, schránka, `LayersPanel`, `NumberField`, `DocumentKeys`.
 - Kvalita: ESLint (`tools/lint` – vlastný balík s TS 6, typescript-eslint nevie TS 7) a Prettier (šírka 160,
   `endOfLine auto` kvôli CRLF) – po zmene `bun run lint` a `bun run format`, obe bez nálezu. Sľub bez čakania
   označiť `void`; modul s komponentom neexportuje nič iné (Fast Refresh – pomocníci do `.ts` vedľa); čas počas
@@ -236,6 +247,8 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   logy INISSu `docshots/iniss-log.ts`, ukážkový server INISS2 `docshots/iniss2-install.ts`. Cesty, meno a adresy
   počítača nahradí `mask()` v `shoot.ts`. Výstup do
   `iniss-tools-docs/static/img/stationsimulator/<článok>/<snímka>-light|dark.png`.
+- Súbor snímok, ktorý si údaje zakladá sám a na konci ich odstráni (`osvetlenie-a-rozhlas`, `schema-stanice`), sa dá
+  spustiť samostatne: `bunx playwright test -c docshots/playwright.config.ts docshots/<súbor>.shots.ts`.
 - Testy prehliadača `e2e/*.e2e.ts` (nie `*.spec.ts` – tie spustí aj bun test): texty podľa SK rozhrania, výber cez
   role a popisy, spoločný server – testy po jednom, každý si zakladá vlastné linky. Správy ako INISS cez
   `e2e/helpers.ts` – trvalé spojenie `openLine` (odpojenie vyvolá upozornenie na výpadok, ktoré prekryje tlačidlá).

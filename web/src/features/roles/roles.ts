@@ -20,7 +20,7 @@ export const PERMISSION_GROUPS: { label: TextKey; permissions: Permission[] }[] 
   },
   {
     label: "permissions.group.simulation",
-    permissions: [PERMISSIONS.lines, PERMISSIONS.boards, PERMISSIONS.scenarios, PERMISSIONS.designs, PERMISSIONS.recordings],
+    permissions: [PERMISSIONS.lines, PERMISSIONS.boards, PERMISSIONS.scenarios, PERMISSIONS.schemas, PERMISSIONS.designs, PERMISSIONS.recordings],
   },
   { label: "permissions.group.inissview", permissions: [PERMISSIONS.virtual, PERMISSIONS.signage] },
   { label: "permissions.group.admin", permissions: [PERMISSIONS.settings, PERMISSIONS.server, PERMISSIONS.users, PERMISSIONS.keys] },

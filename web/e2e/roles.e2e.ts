@@ -18,7 +18,7 @@ test("vlastna rola: opravnenia, pridelenie a odstranenie", async ({ page }) => {
   await dialog.getByRole("button", { name: "Uložiť" }).click();
   await expect(dialog).toBeHidden();
   const row = page.getByRole("row", { name: /Panely E2E/ });
-  await expect(row).toContainText("2 z 16");
+  await expect(row).toContainText("2 z 17");
 
   // pouzivatel s novou rolou
   await page.goto("/#/users");
@@ -41,7 +41,7 @@ test("vlastna rola: opravnenia, pridelenie a odstranenie", async ({ page }) => {
   await page.getByRole("menuitem", { name: "Upraviť" }).click();
   await page.getByRole("dialog").getByRole("checkbox", { name: "Štatistiky" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Uložiť" }).click();
-  await expect(row).toContainText("3 z 16");
+  await expect(row).toContainText("3 z 17");
   const roles = (await (await page.request.get("/api/roles")).json()) as RoleDto[];
   expect(roles.find((r) => r.displayName === "Panely E2E")).toMatchObject({ permissions: ["simulator.view", "statistics.view", "signage.manage"], users: 1 });
 

@@ -1257,6 +1257,40 @@ export type SetVirtualBoardRequest = {
     layout: string;
 };
 
+export type SchemaBackgroundDto = {
+    version: string;
+};
+
+export type SchemaBoardView = 'live' | 'symbol';
+
+export type SchemaElementDto = {
+    id: number;
+    kind: SchemaElementKind;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    rotation: number;
+    points: Array<SchemaPointDto>;
+    text: string;
+    size: number;
+    color: string;
+    fill: string;
+    stroke: number;
+    line: null | number;
+    address: null | number;
+    circuit: string;
+    view: SchemaBoardView;
+    locked: boolean;
+};
+
+export type SchemaElementKind = 'track' | 'platform' | 'building' | 'area' | 'path' | 'text' | 'board' | 'audio' | 'light' | 'amplifier' | 'commLine';
+
+export type SchemaPointDto = {
+    x: number;
+    y: number;
+};
+
 export type SignageAlign = 'left' | 'center' | 'right';
 
 export type SignageCreatedDto = {
@@ -1456,6 +1490,24 @@ export type StationLineDto = {
 export type StationLineTransport = 'tcp' | 'udp';
 
 export type StationLogFolder = 'none' | 'added' | 'watched' | 'missing' | 'full';
+
+export type StationSchemaDto = {
+    id: number;
+    name: string;
+    width: number;
+    height: number;
+    elements: Array<SchemaElementDto>;
+    background: null | string;
+    backgroundOpacity: number;
+};
+
+export type StationSchemaRequest = {
+    name: string;
+    width: number;
+    height: number;
+    elements: Array<SchemaElementDto>;
+    backgroundOpacity: number;
+};
 
 export type StationXmlTableDto = {
     name: string;
@@ -2879,6 +2931,191 @@ export type RestartServerResponses = {
 };
 
 export type RestartServerResponse = RestartServerResponses[keyof RestartServerResponses];
+
+export type GetStationSchemasData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/schemas';
+};
+
+export type GetStationSchemasErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type GetStationSchemasError = GetStationSchemasErrors[keyof GetStationSchemasErrors];
+
+export type GetStationSchemasResponses = {
+    /**
+     * OK
+     */
+    200: Array<StationSchemaDto>;
+};
+
+export type GetStationSchemasResponse = GetStationSchemasResponses[keyof GetStationSchemasResponses];
+
+export type CreateStationSchemaData = {
+    body: StationSchemaRequest;
+    path?: never;
+    query?: never;
+    url: '/api/schemas';
+};
+
+export type CreateStationSchemaErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type CreateStationSchemaError = CreateStationSchemaErrors[keyof CreateStationSchemaErrors];
+
+export type CreateStationSchemaResponses = {
+    /**
+     * OK
+     */
+    200: StationSchemaDto;
+};
+
+export type CreateStationSchemaResponse = CreateStationSchemaResponses[keyof CreateStationSchemaResponses];
+
+export type DeleteSchemaBackgroundData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/schemas/{id}/background';
+};
+
+export type DeleteSchemaBackgroundErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type DeleteSchemaBackgroundError = DeleteSchemaBackgroundErrors[keyof DeleteSchemaBackgroundErrors];
+
+export type DeleteSchemaBackgroundResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteSchemaBackgroundResponse = DeleteSchemaBackgroundResponses[keyof DeleteSchemaBackgroundResponses];
+
+export type GetSchemaBackgroundData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/schemas/{id}/background';
+};
+
+export type GetSchemaBackgroundErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type GetSchemaBackgroundError = GetSchemaBackgroundErrors[keyof GetSchemaBackgroundErrors];
+
+export type GetSchemaBackgroundResponses = {
+    /**
+     * OK
+     */
+    200: unknown;
+};
+
+export type SetSchemaBackgroundData = {
+    body: Stream;
+    path: {
+        id: number;
+    };
+    query?: {
+        name?: string;
+    };
+    url: '/api/schemas/{id}/background';
+};
+
+export type SetSchemaBackgroundErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type SetSchemaBackgroundError = SetSchemaBackgroundErrors[keyof SetSchemaBackgroundErrors];
+
+export type SetSchemaBackgroundResponses = {
+    /**
+     * OK
+     */
+    200: SchemaBackgroundDto;
+};
+
+export type SetSchemaBackgroundResponse = SetSchemaBackgroundResponses[keyof SetSchemaBackgroundResponses];
+
+export type DeleteStationSchemaData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/schemas/{id}';
+};
+
+export type DeleteStationSchemaErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type DeleteStationSchemaError = DeleteStationSchemaErrors[keyof DeleteStationSchemaErrors];
+
+export type DeleteStationSchemaResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type DeleteStationSchemaResponse = DeleteStationSchemaResponses[keyof DeleteStationSchemaResponses];
+
+export type SetStationSchemaData = {
+    body: StationSchemaRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/api/schemas/{id}';
+};
+
+export type SetStationSchemaErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type SetStationSchemaError = SetStationSchemaErrors[keyof SetStationSchemaErrors];
+
+export type SetStationSchemaResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SetStationSchemaResponse = SetStationSchemaResponses[keyof SetStationSchemaResponses];
 
 export type GetFaultScenariosData = {
     body?: never;

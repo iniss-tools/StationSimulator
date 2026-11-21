@@ -9,6 +9,7 @@ using StationSimulator.Contracts.Boards;
 using StationSimulator.Contracts.Keys;
 using StationSimulator.Contracts.Lines;
 using StationSimulator.Contracts.Scenarios;
+using StationSimulator.Contracts.Schemas;
 using StationSimulator.Contracts.Virtual;
 using AkSignalProfile = StationSimulator.Core.Boards.AkSignal.AkSignalProfile;
 using BoardProfile = StationSimulator.Core.Boards.BoardProfile;
@@ -132,6 +133,12 @@ public sealed class McpToolsServerTests
 
         var scenario = new FaultScenarioRequest("Vypadok", false, null, [new ScenarioStepDto(0, 1000, 7, 129, ScenarioAction.Fault, new BoardFaultDto(FaultKind.NoReply))]);
         Assert.AreEqual(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/scenarios", scenario, TestContext.CancellationToken)).StatusCode);
+        var schema = new StationSchemaRequest("Nastupistia", 1200, 600,
+        [
+            new SchemaElementDto { Id = 1, Kind = SchemaElementKind.Platform, Width = 600, Height = 30 },
+            new SchemaElementDto { Id = 2, Kind = SchemaElementKind.Board, Width = 120, Height = 24, Line = 7, Address = 129 }
+        ]);
+        Assert.AreEqual(HttpStatusCode.OK, (await admin.PostAsJsonAsync("/api/schemas", schema, TestContext.CancellationToken)).StatusCode);
         var key = await admin.PostAsJsonAsync("/api/keys", new CreateAccessKeyRequest("Agent " + role, AccessKeyKind.Api, role), TestContext.CancellationToken);
         var secret = (await key.Content.ReadFromJsonAsync<AccessKeyCreatedDto>(TestContext.CancellationToken))!.Secret;
 
@@ -272,6 +279,14 @@ public sealed class McpToolsServerTests
         Assert.AreEqual(0, fonts.GetProperty("files").GetArrayLength());
         CollectionAssert.Contains(fonts.GetProperty("charFonts").EnumerateArray().Select(f => f.GetString()).ToList(), "7x14");
         Assert.AreEqual("Vypadok", (await mcp.Call("list_scenarios")).GetProperty("scenarios")[0].GetProperty("name").GetString());
+
+        var listed = (await mcp.Call("list_schemas")).GetProperty("schemas")[0];
+        Assert.AreEqual(("Nastupistia", 1, 1, false), (listed.GetProperty("name").GetString(), listed.GetProperty("drawings").GetInt32(),
+            listed.GetProperty("devices").GetInt32(), listed.GetProperty("hasBackground").GetBoolean()));
+        var plan = await mcp.Call("get_schema", new() { ["id"] = listed.GetProperty("id").GetInt32() });
+        Assert.AreEqual("board", plan.GetProperty("elements")[1].GetProperty("kind").GetString());
+        Assert.AreEqual(129, plan.GetProperty("elements")[1].GetProperty("address").GetInt32());
+        StringAssert.Contains(await mcp.Error("get_schema", new() { ["id"] = 999 }), "schema.notFound");
 
         var controller = (await mcp.Call("get_aksignal")).GetProperty("controllers").EnumerateArray().Single();
         Assert.AreEqual(("20-5", "AKSIGNAL", "off"), (controller.GetProperty("id").GetString(), controller.GetProperty("protocol").GetString(),

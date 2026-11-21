@@ -15,6 +15,7 @@ import {
   getSignageOverviewQueryKey,
   getSignageProgramQueryKey,
   getStateQueryKey,
+  getStationSchemasQueryKey,
   getVirtualOverviewQueryKey,
   getVirtualViewQueryKey,
 } from "./generated/@tanstack/react-query.gen";
@@ -166,6 +167,9 @@ function apply(message: LiveMessage) {
       break;
     case "scenarios":
       void queryClient.invalidateQueries({ queryKey: getFaultScenariosQueryKey() });
+      break;
+    case "schemas":
+      void queryClient.invalidateQueries({ queryKey: getStationSchemasQueryKey() });
       break;
   }
 }

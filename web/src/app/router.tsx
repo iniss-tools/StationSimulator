@@ -13,6 +13,7 @@ const AuthPage = lazy(() => import("@/features/auth/AuthPage").then((m) => ({ de
 const BoardKiosk = lazy(() => import("./BoardKiosk").then((m) => ({ default: m.BoardKiosk })));
 const VirtualKiosk = lazy(() => import("@/features/virtual/VirtualKiosk").then((m) => ({ default: m.VirtualKiosk })));
 const PanelKiosk = lazy(() => import("@/features/signage/PanelKiosk").then((m) => ({ default: m.PanelKiosk })));
+const SchemaKiosk = lazy(() => import("@/features/schema/SchemaKiosk").then((m) => ({ default: m.SchemaKiosk })));
 const AuthorizePage = lazy(() => import("@/features/oauth/AuthorizePage").then((m) => ({ default: m.AuthorizePage })));
 const ArchivePage = lazy(() => import("@/features/archive/ArchivePage").then((m) => ({ default: m.ArchivePage })));
 
@@ -73,6 +74,15 @@ const panelKiosk = createRoute({
   },
 });
 
+const schemaKiosk = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/plan/$id",
+  component: function SchemaKioskRoute() {
+    const { id } = schemaKiosk.useParams();
+    return <SchemaKiosk id={Number(id)} />;
+  },
+});
+
 // povolenie pristupu klientovi MCP (OAuth) - server sem presmeruje z /oauth/authorize; bez menu ako prihlasenie
 const authorize = createRoute({
   getParentRoute: () => rootRoute,
@@ -114,6 +124,7 @@ const pages = [
       throw redirect({ to: "/devices" });
     },
   }),
+  createRoute({ getParentRoute: () => shell, path: "/schema", component: lazyRouteComponent(() => import("@/features/schema/SchemaPage"), "SchemaPage") }),
   createRoute({ getParentRoute: () => shell, path: "/lines", component: lazyRouteComponent(() => import("@/features/lines/LinesPage"), "LinesPage") }),
   createRoute({
     getParentRoute: () => shell,
@@ -191,7 +202,7 @@ const pages = [
   }),
 ] as const;
 
-const routeTree = rootRoute.addChildren([boardKiosk, wall, virtualKiosk, panelKiosk, authorize, shell.addChildren(pages)]);
+const routeTree = rootRoute.addChildren([boardKiosk, wall, virtualKiosk, panelKiosk, schemaKiosk, authorize, shell.addChildren(pages)]);
 
 export const router = createRouter({ routeTree, history: createHashHistory(), defaultNotFoundComponent: NotFound });
 

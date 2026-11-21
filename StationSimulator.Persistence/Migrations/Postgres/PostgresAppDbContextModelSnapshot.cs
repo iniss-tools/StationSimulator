@@ -443,6 +443,52 @@ namespace StationSimulator.Persistence.Migrations.Postgres
                     b.ToTable("FaultScenarios", (string)null);
                 });
 
+            modelBuilder.Entity("StationSimulator.Application.Schemas.StationSchemaBackgroundRecord", b =>
+                {
+                    b.Property<int>("SchemaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.HasKey("SchemaId");
+
+                    b.ToTable("StationSchemaBackgrounds", (string)null);
+                });
+
+            modelBuilder.Entity("StationSimulator.Application.Schemas.StationSchemaRecord", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Definition")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StationSchemas", (string)null);
+                });
+
             modelBuilder.Entity("StationSimulator.Application.Signage.SignageGroupRecord", b =>
                 {
                     b.Property<int>("Id")
@@ -1106,6 +1152,15 @@ namespace StationSimulator.Persistence.Migrations.Postgres
                     b.HasOne("StationSimulator.Application.OAuth.OAuthClient", null)
                         .WithMany()
                         .HasForeignKey("ClientId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("StationSimulator.Application.Schemas.StationSchemaBackgroundRecord", b =>
+                {
+                    b.HasOne("StationSimulator.Application.Schemas.StationSchemaRecord", null)
+                        .WithOne()
+                        .HasForeignKey("StationSimulator.Application.Schemas.StationSchemaBackgroundRecord", "SchemaId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

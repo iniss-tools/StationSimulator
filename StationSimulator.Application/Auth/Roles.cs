@@ -26,8 +26,8 @@ public static class Roles
         Operator =>
         [
             Permissions.SimulatorView, Permissions.LogView, Permissions.ArchiveView, Permissions.StatisticsView, Permissions.LinesManage,
-            Permissions.BoardsControl, Permissions.ScenariosManage, Permissions.DesignsManage, Permissions.RecordingsManage, Permissions.VirtualManage,
-            Permissions.SignageManage
+            Permissions.BoardsControl, Permissions.ScenariosManage, Permissions.SchemasManage, Permissions.DesignsManage, Permissions.RecordingsManage,
+            Permissions.VirtualManage, Permissions.SignageManage
         ],
         Viewer => [Permissions.SimulatorView, Permissions.LogView, Permissions.ArchiveView, Permissions.StatisticsView],
         _ => []

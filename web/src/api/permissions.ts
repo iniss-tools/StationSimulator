@@ -10,6 +10,7 @@ export const PERMISSIONS = {
   lines: "lines.manage",
   boards: "boards.control",
   scenarios: "scenarios.manage",
+  schemas: "schemas.manage",
   designs: "designs.manage",
   recordings: "recordings.manage",
   virtual: "virtual.manage",

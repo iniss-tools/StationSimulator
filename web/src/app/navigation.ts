@@ -12,6 +12,7 @@ import {
   KeyRound,
   LayoutGrid,
   Lightbulb,
+  Map as MapIcon,
   ListVideo,
   ShieldUser,
   Megaphone,
@@ -31,6 +32,7 @@ import type { TextKey } from "@/i18n";
 /** Stranky v rame (adresy za # - rovnake ako pred prestavbou, aby ulozene odkazy platili). */
 export type NavPath =
   | "/devices"
+  | "/schema"
   | "/designs"
   | "/faces"
   | "/lines"
@@ -72,6 +74,7 @@ export const NAV: NavGroup[] = [
     label: "nav.group.simulation",
     items: [
       { to: "/devices", label: "nav.boards", icon: LayoutGrid, permission: PERMISSIONS.view },
+      { to: "/schema", label: "nav.schema", icon: MapIcon, permission: PERMISSIONS.view },
       { to: "/designs", label: "nav.designs", icon: Palette, permission: PERMISSIONS.designs },
       { to: "/faces", label: "nav.faces", icon: Frame, permission: PERMISSIONS.designs },
       { to: "/lines", label: "nav.lines", icon: Cable, permission: PERMISSIONS.view },

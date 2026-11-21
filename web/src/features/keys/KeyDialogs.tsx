@@ -10,6 +10,7 @@ import {
   getHttpsStatusOptions,
   getServerInfoOptions,
   getSignageOverviewOptions,
+  getStationSchemasOptions,
   getVirtualOverviewOptions,
   useSimulatorState,
   type AccessKeyCreatedDto,
@@ -87,6 +88,7 @@ export function CreatedKeyDialog({ created, onClose }: { created: AccessKeyCreat
   const live = useSimulatorState();
   const device = created.key.kind === "device";
   const virtual = useQuery({ ...getVirtualOverviewOptions(), enabled: device }).data?.boards ?? [];
+  const schemas = useQuery({ ...getStationSchemasOptions(), enabled: device }).data ?? [];
   const panels = useQuery({ ...getSignageOverviewOptions(), enabled: device }).data?.panels ?? [];
   const https = useQuery({ ...getHttpsStatusOptions(), enabled: device }).data;
   const httpsPort = https?.enabled ? https.port : null;
@@ -107,6 +109,7 @@ export function CreatedKeyDialog({ created, onClose }: { created: AccessKeyCreat
   const pages = [
     ...panels.map((p) => ({ value: `#/panel/${p.id}`, label: t("keys.page.panel", { id: p.id, name: p.definition.name }) })),
     ...virtual.map((b) => ({ value: `#/virtual/${b.id}`, label: t("keys.page.virtual", { id: b.id, name: b.name }) })),
+    ...schemas.map((s) => ({ value: `#/plan/${s.id}`, label: t("keys.page.plan", { name: s.name }) })),
     { value: "#/wall", label: t("keys.page.wall") },
     ...live.boards.map((b) => ({ value: `#/view/${b.id}`, label: t("keys.page.board", { name: b.name ? `${b.name} (${b.id})` : b.id }) })),
   ];
