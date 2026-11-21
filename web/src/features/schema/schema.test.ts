@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AnnouncementDto, BoardDto, LineDto, SchemaElementDto, SchemaElementKind } from "@/api";
+import { kioskQuery } from "./view";
 import { autoLayout, backgroundAt, backgroundBox, boardOf, elementLabel, elementState, toRequest } from "./schema";
 
 const element = (kind: SchemaElementKind, patch: Partial<SchemaElementDto> = {}): SchemaElementDto => ({
@@ -171,5 +172,14 @@ describe("obrazok pozadia", () => {
     expect(Object.keys(toRequest(draft)).sort()).toEqual(
       ["backgroundHeight", "backgroundOpacity", "backgroundWidth", "backgroundX", "backgroundY", "elements", "height", "name", "width"].sort(),
     );
+  });
+});
+
+describe("adresa kiosku", () => {
+  test("parametre len pre volby, ktore sa lisia od predvolenych", () => {
+    expect(kioskQuery(false, true)).toBe("");
+    expect(kioskQuery(true, true)).toBe("?symbols=1");
+    expect(kioskQuery(false, false)).toBe("?background=0");
+    expect(kioskQuery(true, false)).toBe("?symbols=1&background=0");
   });
 });

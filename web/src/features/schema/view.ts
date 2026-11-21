@@ -76,3 +76,28 @@ export function saveEditorView(view: SchemaEditorView) {
     // bez uloziska sa len nepamata
   }
 }
+
+const BACKGROUND_KEY = "stationsimulator.schema.background";
+
+/** Obrazok pozadia schemy sa pri zobrazeni kresli (predvolene ano). */
+export function loadBackgroundShown(): boolean {
+  try {
+    return localStorage.getItem(BACKGROUND_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
+
+export function saveBackgroundShown(shown: boolean) {
+  try {
+    localStorage.setItem(BACKGROUND_KEY, shown ? "1" : "0");
+  } catch {
+    // bez uloziska sa len nepamata
+  }
+}
+
+/** Parametre adresy kiosku schemy podla volieb stranky: znacky namiesto tabul a skryty obrazok pozadia. */
+export function kioskQuery(symbols: boolean, backgroundShown: boolean): string {
+  const query = [symbols ? "symbols=1" : "", backgroundShown ? "" : "background=0"].filter(Boolean).join("&");
+  return query ? `?${query}` : "";
+}

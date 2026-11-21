@@ -77,14 +77,15 @@ const panelKiosk = createRoute({
 const schemaKiosk = createRoute({
   getParentRoute: () => rootRoute,
   path: "/plan/$id",
-  // ?symbols=1 = tabule ako znacky s nazvom a stavom
+  // ?symbols=1 = tabule ako znacky s nazvom a stavom, ?background=0 = bez obrazka pozadia
   validateSearch: (search: Record<string, unknown>) => ({
     symbols: search.symbols === 1 || search.symbols === "1" || search.symbols === true ? true : undefined,
+    background: search.background === 0 || search.background === "0" || search.background === false ? false : undefined,
   }),
   component: function SchemaKioskRoute() {
     const { id } = schemaKiosk.useParams();
-    const { symbols } = schemaKiosk.useSearch();
-    return <SchemaKiosk id={Number(id)} symbols={symbols === true} />;
+    const { symbols, background } = schemaKiosk.useSearch();
+    return <SchemaKiosk id={Number(id)} symbols={symbols === true} background={background !== false} />;
   },
 });
 

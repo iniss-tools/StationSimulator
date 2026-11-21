@@ -156,6 +156,14 @@ test("schema stanice: editor, zivy stav a kiosk", async ({ page }) => {
   await page.getByRole("button", { name: "Značky" }).click();
   await expect(page.locator("main canvas")).toHaveCount(1);
 
+  // obrazok pozadia sa da na stranke skryt a znova zobrazit
+  const plan = page.locator("main svg image");
+  await expect(plan).toHaveCount(1);
+  await page.getByRole("button", { name: "Pozadie" }).click();
+  await expect(plan).toHaveCount(0);
+  await page.getByRole("button", { name: "Pozadie" }).click();
+  await expect(plan).toHaveCount(1);
+
   // detail zariadenia
   await broken.click();
   const detail = page.getByRole("dialog");

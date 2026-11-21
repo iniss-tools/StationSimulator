@@ -1923,6 +1923,8 @@ export const sk = {
   "schema.color.custom": "Vlastná",
   "schema.symbols": "Značky",
   "schema.symbols.hint": "Tabule ako malé indikátory s názvom a farbou stavu namiesto živého obsahu.",
+  "schema.backgroundShown": "Pozadie",
+  "schema.backgroundShown.hint": "Zobraziť alebo skryť obrázok pozadia schémy.",
   "schema.background.whole": "Na celé plátno",
   "schema.background.move": "Upraviť myšou",
   "schema.background.move.hint": "Obrázok sa dá na plátne ťahať a úchytmi mu zmeniť veľkosť. Prvky sa vtedy nedajú vybrať.",

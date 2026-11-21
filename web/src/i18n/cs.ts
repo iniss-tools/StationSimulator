@@ -1926,6 +1926,8 @@ export const cs: Record<TextKey, string> = {
   "schema.color.custom": "Vlastní",
   "schema.symbols": "Značky",
   "schema.symbols.hint": "Tabule jako malé indikátory s názvem a barvou stavu místo živého obsahu.",
+  "schema.backgroundShown": "Pozadí",
+  "schema.backgroundShown.hint": "Zobrazit nebo skrýt obrázek pozadí schématu.",
   "schema.background.whole": "Na celé plátno",
   "schema.background.move": "Upravit myší",
   "schema.background.move.hint": "Obrázek lze na plátně táhnout a úchyty mu změnit velikost. Prvky se v tu chvíli nedají vybrat.",
