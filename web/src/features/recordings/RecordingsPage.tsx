@@ -223,7 +223,7 @@ export function RecordingsPage() {
             </Label>
             {manage && (
               <>
-                <input ref={upload} type="file" accept=".tsrec" multiple hidden onChange={(e) => onUpload(e.target.files)} />
+                <input ref={upload} type="file" accept=".stsrec" multiple hidden onChange={(e) => onUpload(e.target.files)} />
                 <Button variant="outline" className="ml-auto" onClick={() => upload.current?.click()}>
                   <Upload />
                   {t("rec.upload")}

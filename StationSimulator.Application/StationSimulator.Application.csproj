@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- Aplikacna vrstva simulatora: prikazy a dotazy (CQRS bez mediatora), validatory, dekoratory, sluzby a mapovanie
+	     na kontrakty API. Bez ASP.NET Core - server ich len vola z endpointov. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Library</OutputType>
+		<RootNamespace>StationSimulator.Application</RootNamespace>
+		<AssemblyName>StationSimulator.Application</AssemblyName>
+		<LangVersion>default</LangVersion>
+	</PropertyGroup>
+	<ItemGroup>
+		<InternalsVisibleTo Include="StationSimulator.Tests" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\StationSimulator.Core\StationSimulator.Core.csproj" />
+		<ProjectReference Include="..\StationSimulator.Contracts\StationSimulator.Contracts.csproj" />
+		<ProjectReference Include="..\..\ToolsCore\ToolsCore.Iniss2\ToolsCore.Iniss2.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="FluentValidation" Version="12.1.1" />
+		<PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="12.1.1" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.12" />
+		<PackageReference Include="Scrutor" Version="7.0.0" />
+	</ItemGroup>
+	<ItemGroup>
+		<!-- vstavane rozlozenia virtualnych tabul (data) -->
+		<EmbeddedResource Include="Virtual\Layouts\*.json" />
+		<!-- vstavane predlohy ciel tabul (data) -->
+		<EmbeddedResource Include="Faces\BuiltIn\*.json" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,1008 @@
+using System.Globalization;
+using StationSimulator.Core.Boards;
+using StationSimulator.Core.Boards.AkSignal;
+using StationSimulator.Core.Boards.Flaps;
+using StationSimulator.Core.Boards.History;
+using StationSimulator.Core.Boards.RemoteAudio;
+using StationSimulator.Core.Lines;
+using StationSimulator.Core.Protocols;
+using StationSimulator.Core.Protocols.AkSignal;
+using StationSimulator.Core.Protocols.Dtr;
+using StationSimulator.Core.Protocols.Apel;
+using StationSimulator.Core.Protocols.Elsvo;
+using StationSimulator.Core.Simulation.Events;
+using StationSimulator.Core.Statistics;
+using StationSimulator.Core.Protocols.Elektrocas;
+using StationSimulator.Core.Protocols.Elen;
+using StationSimulator.Core.Protocols.Ers;
+using StationSimulator.Core.Protocols.Remote;
+using StationSimulator.Core.Recording;
+
+namespace StationSimulator.Core.Simulation;
+
+/// <summary>
+/// Jadro StationSimulatora: linky, zariadenia na nich a zaznam komunikacie. Bez sietoveho prenosu - ten zabezpecuje
+/// <see cref="Transport.LineHost" />, ktory sem posiela prijate bajty a odosiela vratene odpovede.
+/// Vsetky metody su bezpecne pre volanie z viacerych vlakien.
+/// </summary>
+public sealed class Simulator
+{
+    /// <summary>Kolko zaznamov komunikacie sa drzi.</summary>
+    public const int LogCapacity = 5000;
+
+    /// <summary>Najvacsi rozmer novej tabule z katalogu stanice (ako overenie profilu tabule).</summary>
+    private const int MaxImportWidth = 4096, MaxImportRows = 256;
+
+    private readonly Lock _lock = new();
+    private readonly SortedDictionary<int, SimLine> _lines = [];
+    private readonly Dictionary<string, SimBoard> _boards = [];
+    private readonly LinkedList<FrameRecord> _log = [];
+    private readonly TimeProvider _time;
+    private readonly TrafficCollector _traffic = new();
+    private SessionRecorder? _recorder;
+    private SimEnvironment _environment = new();
+    private readonly DeviceHistoryCollector _history = new();
+    private long _seq;
+
+    public Simulator(TimeProvider? time = null)
+    {
+        _time = time ?? TimeProvider.System;
+    }
+
+    /// <summary>Udalosti pre rozhranie; vyvolavaju sa mimo zamku.</summary>
+    public event Action<SimulatorEvent>? Changed;
+
+    /// <summary>Prijate bajty linky (od INISSu aj zo zaznamu) - pre zrkadlo; vyvolava sa mimo zamku v poradi prijatia.</summary>
+    public event Action<int, byte[]>? Traffic;
+
+    /// <summary>Triedy liniek (TableClass), ktore simulator pozna.</summary>
+    public static IReadOnlyList<int> SupportedClasses => [.. Protocols.Keys.Order()];
+
+    /// <summary>Trieda linky spinania zosilnovaca signalom DTR (len simulator, INISS ju nema).</summary>
+    public const int ModemSignalClass = DtrProtocol.TableClass;
+
+    /// <summary>Vyrobcovia tabul (<c>MANUFACTURER_KEY</c>), ktore simulator na linke danej triedy zobrazi; prvy je predvoleny.</summary>
+    public static IReadOnlyList<string> ManufacturersFor(int tableClass) =>
+        Protocols.TryGetValue(tableClass, out var p) ? p.Manufacturers : [];
+
+    /// <summary>Aktualny cas simulatora.</summary>
+    public DateTimeOffset Now => _time.GetUtcNow();
+
+    /// <summary>Okolie simulatora - poloha pre snimac tmy a dlzky zvukov banky.</summary>
+    public SimEnvironment Environment
+    {
+        get
+        {
+            lock (_lock)
+                return _environment;
+        }
+    }
+
+    /// <summary>Nastavi okolie simulatora; zariadenia ho pouziju pri dalsej sprave alebo tiku (<see cref="Tick" />).</summary>
+    public void SetEnvironment(SimEnvironment environment)
+    {
+        ArgumentNullException.ThrowIfNull(environment);
+        lock (_lock)
+            _environment = environment;
+    }
+
+    /// <summary>
+    /// Posunie obsah zariadeni, ktory sa meni s casom aj bez spravy INISSu (snimac tmy, koniec hlasenia, ticho servera)
+    /// - server vola kazdu sekundu. Vrati pocet zmenenych tabul.
+    /// </summary>
+    public int Tick()
+    {
+        var events = new List<SimulatorEvent>();
+        lock (_lock)
+        {
+            var now = Now;
+            foreach (var board in _boards.Values)
+            {
+                if (board.PoweredOff || board.Display is not ITimedDisplay timed || !timed.Advance(now, board.EffectiveProfile, _environment.Location))
+                    continue;
+                board.Version++;
+                _history.Observe(board, now);
+                events.Add(new BoardChanged(board.Id));
+            }
+        }
+
+        Raise(events);
+        return events.Count;
+    }
+
+    /// <summary>Vykona <paramref name="action" /> pod zamkom simulatora - na citanie konzistentneho stavu.</summary>
+    public T Read<T>(Func<Simulator, T> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        lock (_lock)
+            return action(this);
+    }
+
+    /// <summary>Linky podla cisla (citat pod <see cref="Read{T}" />).</summary>
+    public IEnumerable<SimLine> Lines => _lines.Values;
+
+    /// <summary>Tabule podla linky a adresy (citat pod <see cref="Read{T}" />).</summary>
+    public IEnumerable<SimBoard> Boards => _boards.Values.OrderBy(b => b.Line).ThenBy(b => b.Address);
+
+    /// <summary>Linka podla cisla (citat pod <see cref="Read{T}" />).</summary>
+    public SimLine? FindLine(int number) => _lines.GetValueOrDefault(number);
+
+    /// <summary>Tabula podla identifikatora (citat pod <see cref="Read{T}" />).</summary>
+    public SimBoard? FindBoard(string id) => _boards.GetValueOrDefault(id);
+
+    /// <summary>Zaznamy komunikacie s poradovym cislom vacsim ako <paramref name="afterSeq" />.</summary>
+    public IReadOnlyList<FrameRecord> LogSince(long afterSeq, int max = LogCapacity)
+    {
+        lock (_lock)
+            return _log.Where(r => r.Seq > afterSeq).TakeLast(max).ToList();
+    }
+
+    /// <summary>Vymaze zaznam komunikacie.</summary>
+    public void ClearLog()
+    {
+        lock (_lock)
+            _log.Clear();
+    }
+
+    /// <summary>Nahradi vsetky linky a tabule podla nastavenia.</summary>
+    public void Load(SimulatorConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        lock (_lock)
+        {
+            _lines.Clear();
+            _boards.Clear();
+            foreach (var line in config.Lines)
+                AddLineCore(line);
+            foreach (var board in config.Boards)
+                AddBoardCore(board);
+        }
+
+        Raise([new StructureChanged()]);
+    }
+
+    /// <summary>Aktualne nastavenie na ulozenie.</summary>
+    public SimulatorConfig ToConfig()
+    {
+        lock (_lock)
+        {
+            return new SimulatorConfig
+            {
+                Lines = _lines.Values.Select(l => new LineConfig(l.Number, l.TableClass, l.Endpoint.ToString())
+                {
+                    Name = l.Name, Mode = l.Mode, AutoLearn = l.AutoLearn, Manufacturer = l.Manufacturer, Mirror = l.Mirror?.ToString()
+                }).ToList(),
+                Boards = Boards.Select(b => new BoardConfig(b.Line, b.Address, b.ManufacturerKey)
+                {
+                    Name = b.Name, Profile = b.Profile, Design = b.Design, Fault = b.Fault, SecondAddress = b.SecondAddress
+                }).ToList()
+            };
+        }
+    }
+
+    /// <summary>Prida linku alebo nahradi linku s rovnakym cislom (tabule na nej ostanu).</summary>
+    public SimLine SetLine(LineConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        SimLine line;
+        lock (_lock)
+            line = AddLineCore(config);
+        Raise([new StructureChanged()]);
+        return line;
+    }
+
+    /// <summary>
+    /// Zalozi linky a tabule stanice: chybajuce linky prida (samoucenie zapnute), existujucim zmeni triedu a port
+    /// (nazov, rezim a zrkadlo ostanu), chybajuce tabule prida s profilom podla vyrobcu, ktory sa zvacsi podla obsahu;
+    /// tabule, ktore uz su, necha tak, ako ich obsluha nastavila.
+    /// </summary>
+    public StationImportResult ImportStation(StationImport import)
+    {
+        ArgumentNullException.ThrowIfNull(import);
+        int linesAdded = 0, linesUpdated = 0, boardsAdded = 0, boardsKept = 0;
+        var unsupported = new List<int>();
+        var skipped = new List<string>();
+        var faces = new List<string>();
+        lock (_lock)
+        {
+            foreach (var station in import.Lines)
+            {
+                var manufacturers = ManufacturersFor(station.TableClass);
+                if (manufacturers.Count == 0 || station.Number is < 1 or > 100)
+                {
+                    unsupported.Add(station.Number);
+                    continue;
+                }
+
+                var endpoint = new LineEndpoint(station.Transport, "0.0.0.0", station.Port);
+                // vyrobca samoucenia podla prvej tabule linky, ktoru simulator zobrazi
+                var manufacturer = import.Boards.Where(b => b.Line == station.Number).Select(b => b.Manufacturer)
+                    .FirstOrDefault(m => manufacturers.Contains(m, StringComparer.OrdinalIgnoreCase)) ?? manufacturers[0];
+                if (_lines.TryGetValue(station.Number, out var old))
+                {
+                    // linka uz pocuva - pri rovnakom spojeni ostane jej adresa, zmeni sa len port
+                    if (old.Endpoint.Transport == station.Transport)
+                        endpoint = old.Endpoint with { Port = station.Port };
+                    if (old.TableClass == station.TableClass && old.Endpoint == endpoint)
+                        continue;
+                    AddLineCore(new LineConfig(old.Number, station.TableClass, endpoint.ToString())
+                    {
+                        Name = old.Name.Length > 0 ? old.Name : station.Name,
+                        Mode = old.Mode,
+                        AutoLearn = old.AutoLearn,
+                        Manufacturer = manufacturers.Contains(old.Manufacturer, StringComparer.OrdinalIgnoreCase) ? old.Manufacturer : manufacturer,
+                        Mirror = old.Mirror?.ToString()
+                    });
+                    linesUpdated++;
+                }
+                else
+                {
+                    AddLineCore(new LineConfig(station.Number, station.TableClass, endpoint.ToString())
+                    {
+                        Name = station.Name, AutoLearn = true, Manufacturer = manufacturer
+                    });
+                    linesAdded++;
+                }
+            }
+
+            foreach (var board in import.Boards)
+            {
+                if (unsupported.Contains(board.Line) || !_lines.TryGetValue(board.Line, out var line))
+                    continue;
+                var key = ManufacturersFor(line.TableClass).FirstOrDefault(m => string.Equals(m, board.Manufacturer, StringComparison.OrdinalIgnoreCase));
+                if (key is null)
+                {
+                    skipped.Add(SimBoard.MakeId(board.Line, board.Address));
+                    continue;
+                }
+
+                if (_boards.TryGetValue(SimBoard.MakeId(board.Line, board.Address), out var existing))
+                {
+                    // zoznamy listov su data stanice, nie nastavenie obsluhy - prevezmu sa aj pre tabulu, ktora uz je
+                    if (board.Flaps is { } flaps && existing.Display is FlapDisplay)
+                    {
+                        // farby listov nastavene v simulatore ostanu
+                        existing.Profile = existing.Profile with { Flaps = flaps with { Colors = FlapColors.Keep(existing.Profile.Flaps, flaps) } };
+                        existing.Version++;
+                    }
+
+                    // svetla a audio linky ustredne su data stanice - snimac tmy a stavy od obsluhy ostanu
+                    if (board.AkSignal is { } station && existing.Display is AkSignalDisplay)
+                    {
+                        existing.Profile = existing.Profile with
+                        {
+                            AkSignal = (existing.Profile.AkSignal ?? AkSignalProfile.Default) with { Lights = station.Lights, Audio = station.Audio }
+                        };
+                        existing.Version++;
+                    }
+
+                    // tabula zo samoucenia nema nazov - dostane ho zo stanice, nazov od obsluhy ostane
+                    if (existing.Name.Length == 0 && !string.IsNullOrWhiteSpace(board.Name))
+                    {
+                        existing.Name = board.Name;
+                        existing.Version++;
+                    }
+
+                    // celo len na vyziadanie a len tabuli bez cela - celo vybrate (aj odobrate) obsluhou ostane
+                    if (import.FacesForExisting && board.Face is { } face && existing.Profile is { Face: null, Header: null })
+                    {
+                        existing.Profile = WithFace(existing.Profile, board, face);
+                        existing.Version++;
+                        faces.Add(face);
+                    }
+
+                    boardsKept++;
+                    continue;
+                }
+
+                var profile = BoardProfile.DefaultFor(key) with { AutoSize = true };
+                if (board.AkSignal is { } controller)
+                    profile = profile with { AkSignal = AkSignalProfile.Default with { Lights = controller.Lights, Audio = controller.Audio } };
+                if (board.Flaps is { } layout)
+                {
+                    var positions = layout.Modules.Count == 0 ? profile.Width / 8 : layout.Modules.Max(m => m.Position + m.Span);
+                    profile = profile with
+                    {
+                        Flaps = layout, Rows = Math.Max(1, board.FlapRecords * Math.Max(1, layout.LinesPerRecord)), Width = Math.Max(1, positions) * 8
+                    };
+                }
+                else if (board.Width > 0 && board.Rows > 0)
+                {
+                    // rozmer z katalogu - samoucenie ho len zvacsi
+                    profile = profile with { Width = Math.Min(board.Width, MaxImportWidth), Rows = Math.Min(board.Rows, MaxImportRows) };
+                }
+
+                if (board.Face is { } newFace)
+                {
+                    profile = WithFace(profile, board, newFace);
+                    faces.Add(newFace);
+                }
+
+                AddBoardCore(new BoardConfig(board.Line, board.Address, key) { Name = board.Name, Profile = profile });
+                boardsAdded++;
+            }
+        }
+
+        Raise([new StructureChanged()]);
+        return new StationImportResult(linesAdded, linesUpdated, boardsAdded, boardsKept, unsupported, skipped) { FacesAssigned = faces };
+    }
+
+    /// <summary>Profil s celom z importu stanice.</summary>
+    private static BoardProfile WithFace(BoardProfile profile, StationBoard board, string face) => profile with
+    {
+        Face = face, FaceValues = board.FaceValues is { Count: > 0 } values ? new Dictionary<string, string>(values, StringComparer.Ordinal) : null
+    };
+
+    /// <summary>Odstrani linku aj s jej tabulami.</summary>
+    public bool RemoveLine(int number)
+    {
+        lock (_lock)
+        {
+            if (!_lines.Remove(number))
+                return false;
+            foreach (var id in _boards.Values.Where(b => b.Line == number).Select(b => b.Id).ToList())
+                _boards.Remove(id);
+        }
+
+        Raise([new StructureChanged()]);
+        return true;
+    }
+
+    /// <summary>Prida tabulu alebo nahradi nastavenie tabule s rovnakou linkou a adresou.</summary>
+    public SimBoard SetBoard(BoardConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        SimBoard board;
+        lock (_lock)
+            board = AddBoardCore(config);
+        Raise([new StructureChanged()]);
+        return board;
+    }
+
+    /// <summary>Odstrani tabulu.</summary>
+    public bool RemoveBoard(string id)
+    {
+        lock (_lock)
+        {
+            if (!_boards.Remove(id))
+                return false;
+            _history.Forget(id);
+        }
+
+        Raise([new StructureChanged()]);
+        return true;
+    }
+
+    /// <summary>Zmeni profil tabule (napr. snimac a stavy ustredne AK Signal); vrati false, ak tabula nie je.</summary>
+    public bool UpdateProfile(string id, Func<BoardProfile, BoardProfile> update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board))
+                return false;
+            board.Profile = update(board.Profile);
+            AdvanceTimed(board);
+            board.Version++;
+            _history.Observe(board, Now);
+        }
+
+        Raise([new BoardChanged(id)]);
+        return true;
+    }
+
+    /// <summary>Linka cita signal DTR INISSu (spinanie zosilnovaca, <see cref="DtrProtocol" />) namiesto sprav.</summary>
+    public bool WatchesModemSignal(int line)
+    {
+        lock (_lock)
+            return _lines.TryGetValue(line, out var l) && l.Protocol is DtrProtocol;
+    }
+
+    /// <summary>
+    /// Signal DTR INISSu na linke spinania zosilnovaca (na druhom konci paru portov DSR alebo DCD): zopne alebo vypne
+    /// zosilnovac - zariadenie na adrese <see cref="DtrProtocol.DeviceAddress" />, ak nie je, zalozi ho. Zmenu zapise do
+    /// zaznamu komunikacie. Vrati true, ak sa stav zmenil.
+    /// </summary>
+    public bool SetModemSignal(int line, bool on)
+    {
+        var events = new List<SimulatorEvent>();
+        lock (_lock)
+        {
+            if (!_lines.TryGetValue(line, out var simLine) || simLine.Protocol is not DtrProtocol)
+                return false;
+            var id = SimBoard.MakeId(line, DtrProtocol.DeviceAddress);
+            if (!_boards.TryGetValue(id, out var board))
+            {
+                if (!on)
+                    return false;
+                board = new SimBoard(line, DtrProtocol.DeviceAddress, "", DtrProtocol.Manufacturer, BoardProfile.DefaultFor(DtrProtocol.Manufacturer),
+                    simLine.Protocol.CreateDisplay(DtrProtocol.Manufacturer))
+                {
+                    AutoCreated = true
+                };
+                _boards[id] = board;
+                events.Add(new StructureChanged());
+            }
+
+            if (board.PoweredOff || board.Display is not AmplifierDisplay amplifier)
+                return false;
+            var changed = on ? amplifier.SwitchOn(0, 1, Now) : amplifier.SwitchOff(0);
+            if (!changed)
+                return false;
+            simLine.LastReceivedAt = Now;
+            board.Stats.Frames++;
+            board.Stats.LastFrameAt = Now;
+            board.Version++;
+            events.Add(new FrameLogged(AddLog(line, FrameDirection.Received, DtrProtocol.DeviceAddress, [], FrameStatus.Ok, new FrameInfo(on ? "dtr.on" : "dtr.off"))));
+            events.Add(new BoardChanged(id));
+        }
+
+        Raise(events);
+        return true;
+    }
+
+    /// <summary>
+    /// Prerusi hlasenie rozhlasu vzdialeneho INISSu (fronta null = vsetky): dalsia odpoved riadiacemu INISSu nebude mat
+    /// stav fronty a riadiaci zapise <c>remote break</c>.
+    /// </summary>
+    public BreakResult BreakAnnouncement(string id, string? queue)
+    {
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board))
+                return BreakResult.NotFound;
+            if (board.Display is not RemoteAudioDisplay audio)
+                return BreakResult.NotRemoteAudio;
+            if (!audio.Break(queue, Now))
+                return BreakResult.NothingPlaying;
+            board.Version++;
+            _history.Observe(board, Now);
+        }
+
+        Raise([new BoardChanged(id)]);
+        return BreakResult.Broken;
+    }
+
+    /// <summary>
+    /// Nastavi alebo zrusi (null) prekrytie ustredne AK Signal zo scenara - stavy a snimac plati hned, profil sa nemeni.
+    /// Vrati false, ak tabula nie je alebo nie je ustredna.
+    /// </summary>
+    public bool SetOverride(string id, AkSignalOverride? value)
+    {
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board) || value is not null && board.Display is not AkSignalDisplay)
+                return false;
+            if (board.Override == value)
+                return true;
+            board.Override = value;
+            AdvanceTimed(board);
+            board.Version++;
+            _history.Observe(board, Now);
+        }
+
+        Raise([new BoardChanged(id)]);
+        return true;
+    }
+
+    // obsah meniaci sa s casom vyhodnoti hned po zmene profilu, nie az pri dalsom tiku
+    private void AdvanceTimed(SimBoard board)
+    {
+        if (!board.PoweredOff && board.Display is ITimedDisplay timed)
+            timed.Advance(Now, board.EffectiveProfile, _environment.Location);
+    }
+
+    /// <summary>Nastavi predstieranu poruchu tabule.</summary>
+    public bool SetFault(string id, BoardFault fault)
+    {
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board))
+                return false;
+            board.Fault = fault;
+            board.Version++;
+        }
+
+        Raise([new BoardChanged(id)]);
+        return true;
+    }
+
+    /// <summary>
+    /// Vypadok napajania tabule: vypnuta tabula zhasne (obsah sa zmaze), spravy INISSu nedostava a neodpoveda - ako keby na
+    /// adrese nikto nebol; po zapnuti je prazdna, kym jej INISS obsah neposle znova. Vrati false, ak tabula nie je.
+    /// </summary>
+    public bool SetPower(string id, bool on)
+    {
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board))
+                return false;
+            if (board.PoweredOff == !on)
+                return true;
+            board.PoweredOff = !on;
+            if (!on)
+                board.Display.Clear();
+            board.Version++;
+            _history.Observe(board, Now);
+        }
+
+        Raise([new BoardChanged(id)]);
+        return true;
+    }
+
+    /// <summary>
+    /// Predstierany vypadok linky: linka ma stav <see cref="LineStatus.Outage" /> a prenos ju nespusti
+    /// (<see cref="Transport.TransportManager.SyncAsync" /> treba zavolat potom). Vrati false, ak linka nie je.
+    /// </summary>
+    public bool SetLineOutage(int number, bool outage)
+    {
+        lock (_lock)
+        {
+            if (!_lines.TryGetValue(number, out var line))
+                return false;
+            if (line.Outage == outage)
+                return true;
+            line.Outage = outage;
+            _traffic.Status(number, line.Status, outage ? LineStatus.Outage : LineStatus.Stopped, null, Now);
+            line.Status = outage ? LineStatus.Outage : LineStatus.Stopped;
+            line.StatusDetail = null;
+            line.StatusSince = Now;
+            line.Version++;
+        }
+
+        Raise([new LineChanged(number)]);
+        return true;
+    }
+
+    /// <summary>Odoberie zmeny stavu svetiel a skoncene hlasenia ustredni AK Signal od posledneho odberu (historia).</summary>
+    public DeviceHistorySample TakeDeviceHistory()
+    {
+        lock (_lock)
+            return _history.Take();
+    }
+
+    /// <summary>
+    /// Odoberie statistiku komunikacie od posledneho odberu do minuty <paramref name="minute" /> (server kazdu minutu
+    /// a pri zastaveni).
+    /// </summary>
+    public TrafficSample TakeTraffic(long minute)
+    {
+        lock (_lock)
+            return _traffic.Take(minute, _boards.Values);
+    }
+
+    /// <summary>
+    /// Prehratie naprazdno pri posune prehravania zaznamu: tabule liniek <paramref name="lines" /> zmaze (aj rozpracovane
+    /// spravy linky) a spracuje spravy INISSu <paramref name="frames" /> - tabule dostanu obsah ako v danom mieste
+    /// zaznamu, no nic sa nezapise do komunikacie ani statistiky, pocitadla liniek a tabul ostanu a INISSu sa nic
+    /// neposle. Na konci jedna zmena struktury (prehliadace nacitaju stav znova).
+    /// </summary>
+    public void FastForward(IReadOnlyCollection<int> lines, IEnumerable<(int Line, byte[] Bytes)> frames)
+    {
+        ArgumentNullException.ThrowIfNull(lines);
+        ArgumentNullException.ThrowIfNull(frames);
+        lock (_lock)
+        {
+            foreach (var number in lines)
+                _lines.GetValueOrDefault(number)?.Protocol.Reset();
+            foreach (var board in _boards.Values.Where(b => lines.Contains(b.Line)))
+                board.Display.Clear();
+
+            var boardStats = _boards.Values.ToDictionary(b => b, b => b.Stats.Save());
+            var lineStats = _lines.Values.ToDictionary(l => l, l => l.Stats.Save());
+            foreach (var (number, bytes) in frames)
+            {
+                if (_lines.TryGetValue(number, out var line))
+                    line.Protocol.Receive(bytes, new Context(this, line, quiet: true));
+            }
+
+            // tabula zo samoucenia pocas prehratia naprazdno zacina s nulovymi pocitadlami
+            foreach (var board in _boards.Values)
+            {
+                board.Stats.Restore(boardStats.TryGetValue(board, out var saved) ? saved : default);
+                board.Version++;
+            }
+
+            foreach (var (line, saved) in lineStats)
+                line.Stats.Restore(saved);
+        }
+
+        Raise([new StructureChanged()]);
+    }
+
+    /// <summary>Zmaze obsah tabule (ako po zapnuti).</summary>
+    public bool ClearBoard(string id)
+    {
+        lock (_lock)
+        {
+            if (!_boards.TryGetValue(id, out var board))
+                return false;
+            board.Display.Clear();
+            board.Version++;
+        }
+
+        Raise([new BoardChanged(id)]);
+        return true;
+    }
+
+    /// <summary>
+    /// Zmeni stav spojenia linky (vola prenos). Cakanie po pripojenom INISSe je <see cref="LineStatus.Lost" /> - INISS
+    /// sa odpojil; po zastaveni linky (zmena koncoveho bodu) linka zase len caka.
+    /// </summary>
+    public void SetLineStatus(int number, LineStatus status, string? detail)
+    {
+        lock (_lock)
+        {
+            // pocas vypadku prenos linky konci - jeho stav vypadok neprepise
+            if (!_lines.TryGetValue(number, out var line) || line.Outage)
+                return;
+            if (status == LineStatus.Connected && line.Status != LineStatus.Connected)
+            {
+                line.Stats.Connections++;
+                line.Protocol.Reset();
+            }
+
+            if (status == LineStatus.Listening && line.Status is LineStatus.Connected or LineStatus.Lost)
+                status = LineStatus.Lost;
+            _traffic.Status(number, line.Status, status, detail, Now);
+            if (status != line.Status)
+                line.StatusSince = Now;
+            line.Status = status;
+            line.StatusDetail = detail;
+            line.Version++;
+        }
+
+        Raise([new LineChanged(number)]);
+    }
+
+    /// <summary>
+    /// Spracuje bajty prijate na linke a vrati odpovede, ktore treba INISSu poslat.
+    /// </summary>
+    /// <param name="lineNumber">cislo linky</param>
+    /// <param name="data">prijate bajty</param>
+    /// <param name="source">od INISSu alebo zo zaznamu</param>
+    public IReadOnlyList<LineReply> Receive(int lineNumber, ReadOnlySpan<byte> data, TrafficSource source = TrafficSource.Line)
+    {
+        Context context;
+        lock (_lock)
+        {
+            if (!_lines.TryGetValue(lineNumber, out var line))
+                return [];
+
+            line.Stats.BytesIn += data.Length;
+            if (source == TrafficSource.Line)
+                line.LastReceivedAt = Now;
+            context = new Context(this, line);
+            line.Protocol.Receive(data, context);
+            foreach (var changed in context.Events.OfType<BoardChanged>().Select(e => e.BoardId).Distinct())
+            {
+                if (_boards.TryGetValue(changed, out var board))
+                    _history.Observe(board, Now);
+            }
+
+            var sent = 0L;
+            foreach (var reply in context.Replies)
+                sent += reply.Bytes.Length;
+            line.Stats.BytesOut += sent;
+            _traffic.Bytes(lineNumber, data.Length, sent);
+            line.Version++;
+
+            if (source == TrafficSource.Line && _recorder is { } recorder)
+            {
+                var now = Now;
+                recorder.Add(lineNumber, FrameDirection.Received, data, now);
+                foreach (var reply in context.Replies)
+                    recorder.Add(lineNumber, FrameDirection.Sent, reply.Bytes, now);
+            }
+        }
+
+        context.Events.Add(new LineChanged(lineNumber));
+        Raise(context.Events);
+        if (context.Forwarded is { } forwarded)
+        {
+            foreach (var frame in forwarded)
+                Traffic?.Invoke(lineNumber, frame);
+        }
+        else
+        {
+            Traffic?.Invoke(lineNumber, data.ToArray());
+        }
+
+        return context.Replies;
+    }
+
+    /// <summary>Zapise chybu zrkadla linky (null = v poriadku).</summary>
+    public void SetMirrorError(int number, string? error)
+    {
+        lock (_lock)
+        {
+            if (!_lines.TryGetValue(number, out var line) || line.MirrorError == error)
+                return;
+            line.MirrorError = error;
+            line.Version++;
+        }
+
+        Raise([new LineChanged(number)]);
+    }
+
+    /// <summary>Zacne zapisovat prevadzku liniek do zaznamu; predchadzajuci zaznam vrati (treba ho ukoncit).</summary>
+    public SessionRecorder? StartRecording(SessionRecorder recorder)
+    {
+        lock (_lock)
+        {
+            var previous = _recorder;
+            _recorder = recorder;
+            return previous;
+        }
+    }
+
+    /// <summary>Prestane zapisovat do zaznamu a vrati ho (treba ho ukoncit); null = zaznam nebezal.</summary>
+    public SessionRecorder? StopRecording()
+    {
+        lock (_lock)
+        {
+            var recorder = _recorder;
+            _recorder = null;
+            return recorder;
+        }
+    }
+
+    /// <summary>Zahodi rozpracovanu spravu linky (zaciatok prehravania, nove spojenie).</summary>
+    public void ResetLine(int number)
+    {
+        lock (_lock)
+            _lines.GetValueOrDefault(number)?.Protocol.Reset();
+    }
+
+    /// <summary>
+    /// Doplni linky a tabule, ktore v simulatore chybaju (napr. zo zaznamu z ineho pocitaca); existujuce nemeni.
+    /// </summary>
+    /// <returns>pribudla aspon jedna linka (treba spustit jej server)</returns>
+    public bool AddMissing(SimulatorConfig config)
+    {
+        ArgumentNullException.ThrowIfNull(config);
+        var linesAdded = false;
+        var changed = false;
+        lock (_lock)
+        {
+            foreach (var line in config.Lines.Where(l => !_lines.ContainsKey(l.Number)))
+            {
+                try
+                {
+                    AddLineCore(line);
+                    linesAdded = changed = true;
+                }
+                catch (ArgumentException)
+                {
+                    // trieda alebo koncovy bod, ktore tento simulator nepozna
+                }
+            }
+
+            foreach (var board in config.Boards.Where(b => _lines.ContainsKey(b.Line) && !_boards.ContainsKey(SimBoard.MakeId(b.Line, b.Address))))
+            {
+                AddBoardCore(board);
+                changed = true;
+            }
+        }
+
+        if (changed)
+            Raise([new StructureChanged()]);
+        return linesAdded;
+    }
+
+    private SimLine AddLineCore(LineConfig config)
+    {
+        if (config.Number is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(config), config.Number, "Line number must be 1-100.");
+
+        var protocol = CreateProtocol(config.TableClass)
+                       ?? throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Unsupported TableClass {config.TableClass}."), nameof(config));
+        var endpoint = LineEndpoint.TryParse(config.Endpoint)
+                       ?? throw new ArgumentException($"Invalid endpoint '{config.Endpoint}'.", nameof(config));
+        LineEndpoint? mirror = null;
+        if (!string.IsNullOrWhiteSpace(config.Mirror))
+        {
+            mirror = LineEndpoint.TryParse(config.Mirror);
+            if (mirror is not { Transport: LineTransport.Serial })
+                throw new ArgumentException($"Invalid mirror '{config.Mirror}' - expected COMn.", nameof(config));
+        }
+
+        var old = _lines.GetValueOrDefault(config.Number);
+        var line = new SimLine(config.Number, config.TableClass, protocol)
+        {
+            Stats = old?.Stats ?? new LineStats(),
+            Name = config.Name,
+            Endpoint = endpoint,
+            Mode = config.Mode,
+            AutoLearn = config.AutoLearn,
+            // vyrobca samoucenia musi patrit k triede linky
+            Manufacturer = ManufacturersFor(config.TableClass).FirstOrDefault(m => string.Equals(m, config.Manufacturer, StringComparison.OrdinalIgnoreCase))
+                           ?? ManufacturersFor(config.TableClass)[0],
+            Mirror = mirror
+        };
+
+        if (old != null)
+        {
+            line.Status = old.Status;
+            line.StatusDetail = old.StatusDetail;
+            line.StatusSince = old.StatusSince;
+            line.LastReceivedAt = old.LastReceivedAt;
+        }
+        else
+        {
+            line.StatusSince = Now;
+        }
+
+        _lines[config.Number] = line;
+
+        // ina rodina protokolu (napr. ELEN → LCD1) - tabule linky dostanu obsah novej rodiny
+        foreach (var board in _boards.Values.Where(b => b.Line == line.Number).ToList())
+        {
+            var display = protocol.CreateDisplay(board.ManufacturerKey);
+            if (board.Display.GetType() == display.GetType())
+                continue;
+            _boards[board.Id] = new SimBoard(board.Line, board.Address, board.Name, board.ManufacturerKey, board.Profile, display)
+            {
+                SecondAddress = board.SecondAddress,
+                Design = board.Design,
+                Fault = board.Fault,
+                AutoCreated = board.AutoCreated,
+                Stats = board.Stats,
+                Version = board.Version + 1
+            };
+        }
+
+        return line;
+    }
+
+    private SimBoard AddBoardCore(BoardConfig config)
+    {
+        if (!_lines.TryGetValue(config.Line, out var line))
+            throw new ArgumentException(string.Create(CultureInfo.InvariantCulture, $"Line {config.Line} does not exist."), nameof(config));
+
+        var id = SimBoard.MakeId(config.Line, config.Address);
+        // obsah ostane, ak vyrobca patri do tej istej rodiny (na linke vzdialeneho INISSu mozu byt rozne)
+        var display = line.Protocol.CreateDisplay(config.Manufacturer);
+        if (_boards.TryGetValue(id, out var old) && old.Display.GetType() == display.GetType())
+            display = old.Display;
+        var board = new SimBoard(config.Line, config.Address, config.Name, config.Manufacturer, config.Profile, display)
+        {
+            SecondAddress = config.SecondAddress is > 0 and < 128 && config.SecondAddress != config.Address ? config.SecondAddress : null,
+            Design = config.Design,
+            Fault = config.Fault,
+            AutoCreated = old?.AutoCreated ?? false,
+            Stats = old?.Stats ?? new BoardStats(),
+            // pri inom vyrobcovi zistenie neplati - overi sa na dalsich spravach
+            Mismatch = string.Equals(old?.ManufacturerKey, config.Manufacturer, StringComparison.OrdinalIgnoreCase) ? old?.Mismatch : null,
+            Version = (old?.Version ?? 0) + 1
+        };
+        _boards[id] = board;
+        return board;
+    }
+
+    // protokoly podla triedy linky (TableClass) a vyrobcovia tabul, ktori na takej linke byvaju
+    private static readonly Dictionary<int, (Func<ILineProtocol> Create, string[] Manufacturers)> Protocols = new()
+    {
+        [1] = (() => new ElektrocasProtocol(), ["LCD"]),
+        [2] = (() => new ErsProtocol(), ["ERS"]),
+        [10] = (() => new ApelProtocol(), ["APEL", "APEL_AN"]),
+        [3] = (() => new ElektrocasProtocol(), ["FERS"]),
+        [4] = (() => new ElenProtocol(), ["ELEN", "ELENOLD", "ELEN10", "ELEN16", "ELEN16Kam", "ELEKON", "ELENWIN", "ELEKONKAM", "ERP_ELEN"]),
+        [5] = (() => new ElektrocasProtocol(), ["LCD1", "ERP"]),
+        [128] = (() => new RemoteProtocol(), [.. RemoteProtocol.Manufacturers]),
+        [129] = (() => new ElsvoProtocol(), ["ELSVO"]),
+        [130] = (() => new ItpProtocol(), ["LCD1", "ERP", "LCD", "FERS"]),
+        [131] = (() => new AkSignalProtocol(), [AkSignalProtocol.Manufacturer]),
+        [132] = (() => new AkSignalUhProtocol(), [AkSignalUhProtocol.Manufacturer]),
+        [DtrProtocol.TableClass] = (() => new DtrProtocol(), [DtrProtocol.Manufacturer])
+    };
+
+    private static ILineProtocol? CreateProtocol(int tableClass) => Protocols.TryGetValue(tableClass, out var p) ? p.Create() : null;
+
+    private void Raise(IEnumerable<SimulatorEvent> events)
+    {
+        var handler = Changed;
+        if (handler == null)
+            return;
+        foreach (var e in events.Distinct())
+            handler(e);
+    }
+
+    private FrameRecord AddLog(int line, FrameDirection direction, int? address, byte[] bytes, FrameStatus status, FrameInfo info)
+    {
+        var record = new FrameRecord(++_seq, Now, line, direction, address, bytes, status, info);
+        _traffic.Frame(line, direction, status);
+        _log.AddLast(record);
+        while (_log.Count > LogCapacity)
+            _log.RemoveFirst();
+        return record;
+    }
+
+    /// <summary>
+    /// Kontext spracovania prijatych bajtov - bezi pod zamkom simulatora.
+    /// </summary>
+    /// <param name="quiet">prehratie naprazdno (<see cref="FastForward" />): bez zaznamu komunikacie, statistiky a odpovedi</param>
+    private sealed class Context(Simulator sim, SimLine line, bool quiet = false) : ILineContext
+    {
+        public List<SimulatorEvent> Events { get; } = [];
+
+        public List<LineReply> Replies { get; } = [];
+
+        /// <summary>Spravy tabul pre zrkadlo; null = zrkadli sa, co prislo (<see cref="ILineProtocol.MirrorsInnerFrames" />).</summary>
+        public List<byte[]>? Forwarded { get; } = line.Protocol.MirrorsInnerFrames ? [] : null;
+
+        public SimLine Line => line;
+
+        public DateTimeOffset Now => sim.Now;
+
+        public SimEnvironment Environment => sim._environment;
+
+        public IReadOnlyList<SimBoard> Boards => sim._boards.Values.Where(b => b.Line == line.Number && !b.PoweredOff).ToList();
+
+        public SimBoard? FindBoard(int address, string? manufacturer = null)
+        {
+            // tabula bez napajania nic neprijima - ako keby na adrese nikto nebol, samoucenie ju nenahradi
+            var id = SimBoard.MakeId(line.Number, address);
+            if (sim._boards.TryGetValue(id, out var board))
+                return board.PoweredOff ? null : board;
+            if (sim._boards.Values.FirstOrDefault(b => b.Line == line.Number && b.SecondAddress == address) is { } second)
+                return second.PoweredOff ? null : second;
+            return line.AutoLearn ? Create(address, manufacturer ?? line.Manufacturer) : null;
+        }
+
+        public SimBoard? Device(int address, string manufacturer)
+        {
+            if (sim._boards.TryGetValue(SimBoard.MakeId(line.Number, address), out var board))
+                return board.PoweredOff ? null : board;
+            return Create(address, manufacturer);
+        }
+
+        private SimBoard Create(int address, string manufacturer)
+        {
+            var board = new SimBoard(line.Number, address, "", manufacturer,
+                BoardProfile.DefaultFor(manufacturer) with { AutoSize = true }, line.Protocol.CreateDisplay(manufacturer))
+            {
+                AutoCreated = true
+            };
+            sim._boards[board.Id] = board;
+            Events.Add(new StructureChanged());
+            return board;
+        }
+
+        public void Changed(SimBoard board)
+        {
+            board.Version++;
+            Events.Add(new BoardChanged(board.Id));
+        }
+
+        public void LogReceived(byte[] bytes, int? address, FrameStatus status, FrameInfo info)
+        {
+            if (!quiet)
+                Events.Add(new FrameLogged(sim.AddLog(line.Number, FrameDirection.Received, address, bytes, status, info)));
+        }
+
+        public void Reply(SimBoard board, byte[] bytes, FrameInfo info, bool positive = true)
+        {
+            if (line.Mode == LineMode.Monitor || quiet)
+                return;
+
+            var reply = BoardFaults.Apply(board, line.Protocol, bytes, info, positive);
+            if (reply.Bytes == null)
+                Events.Add(new FrameLogged(sim.AddLog(line.Number, FrameDirection.Sent, board.Address, [], reply.Status, reply.Info)));
+            else
+                ReplyRaw(board.Address, reply.Bytes, reply.Delay, reply.Status, reply.Info);
+        }
+
+        public void ReplyRaw(int? address, byte[] bytes, TimeSpan delay, FrameStatus status, FrameInfo info, bool log = true)
+        {
+            if (line.Mode == LineMode.Monitor || quiet)
+                return;
+
+            Replies.Add(new LineReply(bytes, delay));
+            if (log)
+                Events.Add(new FrameLogged(sim.AddLog(line.Number, FrameDirection.Sent, address, bytes, status, info)));
+        }
+
+        public void Forward(byte[] frame) => Forwarded?.Add(frame);
+    }
+}

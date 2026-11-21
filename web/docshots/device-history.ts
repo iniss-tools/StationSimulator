@@ -1,6 +1,6 @@
 // Ukazkove 2 hodiny historie ustredni AK Signal a rozhlasu vzdialeneho INISSu pre snimku casovej osi - server ju zapisuje
 // az za chodu, cisty server by nemal co ukazat. Spusta ho osvetlenie-a-rozhlas.shots.ts cez bun (bun:sqlite):
-//   bun docshots/device-history.ts <tablesimulator.db>
+//   bun docshots/device-history.ts <stationsimulator.db>
 // Stavy svetla su bity LightFlags (automatika 1, rucne 2, tma 4, svieti 8, porucha 16), casy v ms od 1970 UTC.
 import { Database } from "bun:sqlite";
 

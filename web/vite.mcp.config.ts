@@ -4,7 +4,7 @@ import react from "@vitejs/plugin-react";
 import { defineConfig, type Plugin } from "vite";
 
 // Aplikacia MCP Apps (zobrazenie tabule v klientovi s MCP Apps): jeden subor HTML so vsetkym vlozenym - ramec hostitela
-// nesmie nic stahovat. Server ho vyda ako zdroje ui://tablesimulator/board.html a virtual.html (TableSimulator/Mcp/AppPages.cs).
+// nesmie nic stahovat. Server ho vyda ako zdroje ui://stationsimulator/board.html a virtual.html (StationSimulator/Mcp/AppPages.cs).
 // Spusta sa po hlavnej zostave webu (bun run build), ktora wwwroot vyprazdni.
 
 /** Vlozi skripty a styly zostavy do HTML a ostatne subory zahodi. */
@@ -39,7 +39,7 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   publicDir: false,
   build: {
-    outDir: "../TableSimulator/wwwroot/mcp-app",
+    outDir: "../StationSimulator/wwwroot/mcp-app",
     emptyOutDir: true,
     // vsetko v jednom subore - obrazky a pisma ako data URL
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,

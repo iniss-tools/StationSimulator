@@ -1,0 +1,74 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<!-- Server simulatora: endpointy API (Api/), WebSocket a infrastruktura (Infrastructure/), webove rozhranie vo wwwroot. -->
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<OutputType>Exe</OutputType>
+		<RootNamespace>StationSimulator</RootNamespace>
+		<AssemblyName>StationSimulator</AssemblyName>
+		<LangVersion>default</LangVersion>
+		<!-- verzia servera (GET /api/server, zaloha) aj instalatora (StationSimulatorInstaller.iss ju cita z .exe);
+		     vydanie ju prepise verziou zo znacky vX.Y (ToolsCore\Build\AppRelease.props) -->
+		<Version>1.0</Version>
+		<ApplicationIcon>app.ico</ApplicationIcon>
+		<WebDir>$(MSBuildProjectDirectory)\..\web</WebDir>
+		<SelfContained>false</SelfContained>
+		<!-- LibraryImport (ConsoleWindow) generuje unsafe kod -->
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+	</PropertyGroup>
+	<!-- Publish pre instalator (dotnet publish -c Release): len win-x64, bez nativnych kniznic pre Linux, macOS a Android
+	     (SQLite, System.IO.Ports). Bezny build a testy ostavaju bez RID. -->
+	<PropertyGroup Condition="'$(_IsPublishing)' == 'true'">
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+	</PropertyGroup>
+	<ItemGroup>
+		<FrameworkReference Include="Microsoft.AspNetCore.App" />
+	</ItemGroup>
+	<ItemGroup>
+		<!-- ako implicitne usingy Microsoft.NET.Sdk.Web (Web SDK sa nepouziva kvoli wwwroot vo vystupe) -->
+		<Using Include="Microsoft.AspNetCore.Builder" />
+		<Using Include="Microsoft.AspNetCore.Hosting" />
+		<Using Include="Microsoft.AspNetCore.Http" />
+		<Using Include="Microsoft.Extensions.DependencyInjection" />
+		<Using Include="Microsoft.Extensions.Hosting" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\StationSimulator.Application\StationSimulator.Application.csproj" />
+		<ProjectReference Include="..\StationSimulator.Contracts\StationSimulator.Contracts.csproj" />
+		<ProjectReference Include="..\StationSimulator.Core\StationSimulator.Core.csproj" />
+		<ProjectReference Include="..\StationSimulator.Persistence\StationSimulator.Persistence.csproj" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+		<PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.12" />
+		<PackageReference Include="ModelContextProtocol.AspNetCore" Version="2.2.0" />
+		<PackageReference Include="ModelContextProtocol.Extensions.Apps" Version="2.2.0" />
+		<PackageReference Include="Scrutor" Version="7.0.0" />
+		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+		<PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+	</ItemGroup>
+
+	<!-- Webove rozhranie (bun + vite) sa zostavi do wwwroot pred buildom; -p:SkipWebBuild=true ho vynecha.
+	     Zdroje webu su polozky az v cieli - staticku ItemGroup by IDE ukazovalo ako odkazy v koreni projektu. -->
+	<Target Name="CollectWebSource">
+		<ItemGroup>
+			<WebSource Include="$(WebDir)\src\**\*;$(WebDir)\public\**\*;$(WebDir)\index.html;$(WebDir)\mcp-app.html;$(WebDir)\vite.mcp.config.ts;$(WebDir)\package.json;$(WebDir)\bun.lock;$(WebDir)\vite.config.ts;$(WebDir)\tsconfig.json" />
+		</ItemGroup>
+	</Target>
+	<Target Name="BuildWeb" DependsOnTargets="CollectWebSource" BeforeTargets="BeforeBuild" Inputs="@(WebSource)" Outputs="$(MSBuildProjectDirectory)\wwwroot\index.html"
+			Condition="'$(SkipWebBuild)' != 'true'">
+		<Exec Command="bun install" WorkingDirectory="$(WebDir)" Condition="!Exists('$(WebDir)\node_modules')" />
+		<Exec Command="bun run build" WorkingDirectory="$(WebDir)" />
+	</Target>
+	<Target Name="IncludeWeb" DependsOnTargets="BuildWeb" BeforeTargets="AssignTargetPaths">
+		<ItemGroup>
+			<Content Include="wwwroot\**" CopyToOutputDirectory="PreserveNewest" />
+		</ItemGroup>
+	</Target>
+	<!-- publish do prazdneho priecinka - subory starsich verzii (aj stary web) by instalator inak zabalil tiez -->
+	<Target Name="CleanPublishDir" BeforeTargets="PrepareForPublish">
+		<RemoveDir Directories="$(PublishDir)" />
+	</Target>
+	<!-- spolocne vlastnosti vydavanych programov: vyrobca, verzia a index aktualizacii z vydania -->
+	<Import Project="..\..\ToolsCore\Build\AppRelease.props" />
+</Project>

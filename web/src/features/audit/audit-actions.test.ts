@@ -5,7 +5,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { sk } from "@/i18n/sk";
 
-const APPLICATION = join(import.meta.dir, "..", "..", "..", "..", "TableSimulator.Application");
+const APPLICATION = join(import.meta.dir, "..", "..", "..", "..", "StationSimulator.Application");
 
 function commands(): string[] {
   const names = new Set<string>();

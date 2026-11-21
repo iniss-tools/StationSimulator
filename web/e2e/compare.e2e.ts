@@ -4,10 +4,10 @@ import { API_HEADERS, collectErrors, elenRow } from "./helpers";
 
 const LINE = 64;
 
-/** Zaznam .tsrec: hlavicka s linkou ELEN a riadky textu tabule 3 v danych casoch. */
+/** Zaznam .stsrec: hlavicka s linkou ELEN a riadky textu tabule 3 v danych casoch. */
 function recording(created: string, rows: [number, string][]): string {
   const header = {
-    format: "TableSimulator.Recording",
+    format: "StationSimulator.Recording",
     version: 1,
     created,
     config: {
@@ -25,7 +25,7 @@ function recording(created: string, rows: [number, string][]): string {
 }
 
 async function upload(page: Page, name: string, content: string) {
-  const response = await page.request.post(`/api/recordings/upload?name=${name}.tsrec`, {
+  const response = await page.request.post(`/api/recordings/upload?name=${name}.stsrec`, {
     headers: { ...API_HEADERS, "Content-Type": "application/octet-stream" },
     data: Buffer.from(content),
   });

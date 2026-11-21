@@ -1,7 +1,8 @@
-# TableSimulator
+# StationSimulator
 
-Simulátor informačných tabúľ pre INISS 3.39. INISS posiela obsah tabúľ po svojich linkách (sekcie `Driver*`)
-a simulátor sa tvári ako tabule na druhom konci linky – odpovedá bajtovým protokolom výrobcu a obsah tabúľ
+Simulátor zariadení stanice pre INISS 3.39 a INISS2: informačných tabúľ, ústrední rozhlasu a osvetlenia
+a zosilňovačov. INISS posiela obsah tabúľ po svojich linkách (sekcie `Driver*`) a simulátor sa tvári ako
+zariadenia na druhom konci linky – odpovedá bajtovým protokolom výrobcu a obsah tabúľ
 zobrazuje vo webovom prehliadači. Navyše ukazuje XML tabúľ a archívy INISSu ako INISSView, hrá informačné panely
 ako INISSView 2, nahráva a porovnáva komunikáciu a predstiera poruchy.
 
@@ -9,10 +10,10 @@ ako INISSView 2, nahráva a porovnáva komunikáciu a predstiera poruchy.
 > produkt spoločnosti CHAPS. Projekt neobsahuje žiadnu časť programu INISS ani jeho dáta; protokoly tabúľ a formáty
 > súborov INISSu boli zistené kvôli interoperabilite.
 
-**Používateľská dokumentácia** je v `iniss-tools-docs/docs/tablesimulator/` (sekcia *Simulátor tabúľ*), protokoly
+**Používateľská dokumentácia** je v `iniss-tools-docs/docs/stationsimulator/` (sekcia *StationSimulator*), protokoly
 tabúľ v `iniss-tools-docs/docs/iniss/protokoly/`. Tento súbor je pre vývoj.
 
-| Téma                                         | Dokumentácia (`docs/tablesimulator/…`)                                     |
+| Téma                                         | Dokumentácia (`docs/stationsimulator/…`)                                     |
 |----------------------------------------------|----------------------------------------------------------------------------|
 | inštalácia, parametre, služba Windows        | `instalacia.mdx`                                                           |
 | pripojenie INISSu, načítanie stanice         | `prve-kroky/`                                                              |
@@ -27,12 +28,12 @@ tabúľ v `iniss-tools-docs/docs/iniss/protokoly/`. Tento súbor je pre vývoj.
 ## Spustenie
 
 ```bash
-dotnet run --project TableSimulator/TableSimulator.csproj
+dotnet run --project StationSimulator/StationSimulator.csproj
 ```
 
 Server otvorí prehliadač na `http://localhost:5470/`. Parametre `--port`, `--no-browser`, `--data`, `--reset-admin`,
 `--install-service` a `--uninstall-service` popisuje `instalacia.mdx`. Chýbajúci parameter nahradí premenná
-prostredia `TABLESIMULATOR_DATA` alebo `TABLESIMULATOR_NO_BROWSER=1` (využívajú ju testy servera). Zrušený `--config`
+prostredia `STATIONSIMULATOR_DATA` alebo `STATIONSIMULATOR_NO_BROWSER=1` (využívajú ju testy servera). Zrušený `--config`
 server len ohlási – linky a tabule sú v databáze a prenášajú sa exportom a importom.
 
 Nad jedným priečinkom nastavení beží jeden server (zámok `server.lock`, `Infrastructure/Hosting/ServerLock`) – ďalšie
@@ -42,57 +43,57 @@ odloží jej kópiu do `before-update\<čas>` (`DatabaseBootstrap.BackupBeforeUp
 ## Inštalátor
 
 ```bash
-dotnet publish TableSimulator/TableSimulator.csproj -c Release        # len win-x64, do prázdneho bin\Release\net10.0\win-x64\publish
-"/c/Program Files/Inno Setup 7/ISCC.exe" TableSimulatorInstaller.iss  # Output\tablesimulator-setup.exe
+dotnet publish StationSimulator/StationSimulator.csproj -c Release        # len win-x64, do prázdneho bin\Release\net10.0\win-x64\publish
+"/c/Program Files/Inno Setup 7/ISCC.exe" StationSimulatorInstaller.iss  # Output\stationsimulator-setup.exe
 ```
 
-`TableSimulatorInstaller.iss` stavia na spoločnom základe inštalátorov `ToolsCore/Installer` (`Common.iss`, `DotNet.iss`):
-služba Windows (`--install-service --data %ProgramData%\TableSimulator`), pravidlo Windows Firewall pre program,
+`StationSimulatorInstaller.iss` stavia na spoločnom základe inštalátorov `ToolsCore/Installer` (`Common.iss`, `DotNet.iss`):
+služba Windows (`--install-service --data %ProgramData%\StationSimulator`), pravidlo Windows Firewall pre program,
 chýbajúci .NET 10 Runtime a ASP.NET Core Runtime. Používateľský opis je v `instalacia.mdx`.
 
-Server zapisuje záznam (Serilog) do konzoly a do denných súborov `logs\tablesimulator-RRRRMMDD.log` v priečinku
+Server zapisuje záznam (Serilog) do konzoly a do denných súborov `logs\stationsimulator-RRRRMMDD.log` v priečinku
 nastavení (14 dní): spojenia liniek s INISSom, vybavené príkazy, prihlásenia, odmietnuté požiadavky a chyby.
 Riadok súboru nesie meno prihláseného používateľa (`-` bez prihlásenia a mimo požiadaviek).
 
-Build zostaví aj webové rozhranie (`bun install` a `bun run build` v `web/`, výstup do `TableSimulator/wwwroot`);
+Build zostaví aj webové rozhranie (`bun install` a `bun run build` v `web/`, výstup do `StationSimulator/wwwroot`);
 `-p:SkipWebBuild=true` ho vynechá. Pri vývoji webu: spustený server a v `web/` `bun run dev` (Vite posiela `/api`
 a `/ws` na server).
 
 ## Testy
 
 ```bash
-dotnet test TableSimulator.Tests/TableSimulator.Tests.csproj   # -p:SkipWebBuild=true bez buildu webu
+dotnet test StationSimulator.Tests/StationSimulator.Tests.csproj   # -p:SkipWebBuild=true bez buildu webu
 cd web && bun test                                            # renderer a pomocné funkcie webu
 cd web && bun run lint && bun run format:check                # ESLint a Prettier
 cd web && bun run e2e                                         # Playwright v Edge proti dvom serverom s čistými dátami
 ```
 
 Testy nad PostgreSQL (`PostgresTests`, časť `DatabaseApiTests`) bežia len s pripojením v premennej
-`TABLESIMULATOR_TEST_POSTGRES` (používateľ smie zakladať databázy – každý test si založí a zmaže vlastnú
+`STATIONSIMULATOR_TEST_POSTGRES` (používateľ smie zakladať databázy – každý test si založí a zmaže vlastnú
 `ts_test_…`), inak sa preskočia. Stačí kontajner:
 
 ```bash
 docker run -d --name ts-pg -e POSTGRES_PASSWORD=<heslo> -p 55432:5432 postgres:17
 ```
 
-a `TABLESIMULATOR_TEST_POSTGRES=Host=localhost;Port=55432;Database=postgres;Username=postgres;Password=<heslo>`.
+a `STATIONSIMULATOR_TEST_POSTGRES=Host=localhost;Port=55432;Database=postgres;Username=postgres;Password=<heslo>`.
 
 ## Architektúra
 
 | Projekt                       | Obsah                                                                                    |
 |-------------------------------|------------------------------------------------------------------------------------------|
-| `TableSimulator.Core`         | `net10.0` bez UI a bez Windows: linky (`Transport/`), protokoly (`Protocols/`), stav tabúľ (`Boards/`), záznam a prehratie (`Recording/`), súbory ELEN Monitora (`Monitor/`), XML tabúľ INISSu a definície INISSView (`Virtual/`), denné archívy TAB/REP (`Archive/`), `Simulation/Simulator` |
-| `TableSimulator.Contracts`    | kontrakty API a WebSocketu – DTO bez logiky a bez závislostí, každé v samostatnom súbore po oblastiach (`Lines/`, `Boards/`, `Display/`, `Frames/`, `Recordings/`, `Live/`…); používa ich aj GVDEditor |
-| `TableSimulator.Application`  | príkazy a dotazy (CQRS bez mediátora) s handlermi a validátormi FluentValidation po oblastiach, dekorátory (overenie, záznam), `Result`/`Error`, mapovanie jadro ↔ kontrakty, služby (záznamy, písma, vzhľady), roly a oprávnenia (`Auth/`) |
-| `TableSimulator.Persistence`  | databáza servera (EF Core + ASP.NET Core Identity): nastavenie servera, linky a tabule, používatelia a roly, kľúče, audit, virtuálne tabule; `AppDbContext` je spoločný, poskytovateľ má vlastnú podtriedu a migrácie (`Sqlite/`, `Migrations/Sqlite/`); `ServerDatabase` otvorí databázu aj mimo DI (štart servera) |
-| `TableSimulator`              | server ASP.NET Core: endpointy v `Api/` (každý v samostatnom súbore), WebSocket `/ws`, Serilog, prihlasovanie a obnova správcu (`Infrastructure/Auth/`), HTTPS a certifikáty (`Infrastructure/Https/`), súbory nastavení a konfigurácie v `Infrastructure/` |
-| `TableSimulator.Tests`        | MSTest – rámce a súčty podľa príkladov z docs (ELEN, LCD1, ITP), rozklad riadku, simulátor, linka TCP aj rúra, záznam a prehratie, aplikačná vrstva, tvar JSON kontraktov, XML tabúľ a `Web.config` INISSView, archívy TAB/REP, server cez `WebApplicationFactory` (prihlasovanie, oprávnenia, virtuálne tabule, archív) |
+| `StationSimulator.Core`         | `net10.0` bez UI a bez Windows: linky (`Transport/`), protokoly (`Protocols/`), stav tabúľ (`Boards/`), záznam a prehratie (`Recording/`), súbory ELEN Monitora (`Monitor/`), XML tabúľ INISSu a definície INISSView (`Virtual/`), denné archívy TAB/REP (`Archive/`), `Simulation/Simulator` |
+| `StationSimulator.Contracts`    | kontrakty API a WebSocketu – DTO bez logiky a bez závislostí, každé v samostatnom súbore po oblastiach (`Lines/`, `Boards/`, `Display/`, `Frames/`, `Recordings/`, `Live/`…); používa ich aj GVDEditor |
+| `StationSimulator.Application`  | príkazy a dotazy (CQRS bez mediátora) s handlermi a validátormi FluentValidation po oblastiach, dekorátory (overenie, záznam), `Result`/`Error`, mapovanie jadro ↔ kontrakty, služby (záznamy, písma, vzhľady), roly a oprávnenia (`Auth/`) |
+| `StationSimulator.Persistence`  | databáza servera (EF Core + ASP.NET Core Identity): nastavenie servera, linky a tabule, používatelia a roly, kľúče, audit, virtuálne tabule; `AppDbContext` je spoločný, poskytovateľ má vlastnú podtriedu a migrácie (`Sqlite/`, `Migrations/Sqlite/`); `ServerDatabase` otvorí databázu aj mimo DI (štart servera) |
+| `StationSimulator`              | server ASP.NET Core: endpointy v `Api/` (každý v samostatnom súbore), WebSocket `/ws`, Serilog, prihlasovanie a obnova správcu (`Infrastructure/Auth/`), HTTPS a certifikáty (`Infrastructure/Https/`), súbory nastavení a konfigurácie v `Infrastructure/` |
+| `StationSimulator.Tests`        | MSTest – rámce a súčty podľa príkladov z docs (ELEN, LCD1, ITP), rozklad riadku, simulátor, linka TCP aj rúra, záznam a prehratie, aplikačná vrstva, tvar JSON kontraktov, XML tabúľ a `Web.config` INISSView, archívy TAB/REP, server cez `WebApplicationFactory` (prihlasovanie, oprávnenia, virtuálne tabule, archív) |
 | `web/`                        | React + TypeScript (bun, Vite): ovládanie a renderer tabúľ; testy `bun test`              |
 
 ### Snímky do dokumentácie
 
 `bun run docshots` vo `web/` zostaví web a server, spustí ukážkovú stanicu (`docshots/demo.ts`) a uloží snímky
-oboch tém do `iniss-tools-docs/static/img/tablesimulator`. Písma ELEN berie z priečinka v premennej `DOCSHOTS_FONTS`
+oboch tém do `iniss-tools-docs/static/img/stationsimulator`. Písma ELEN berie z priečinka v premennej `DOCSHOTS_FONTS`
 (napr. `Sim\FONT` programu ELEN Monitor); bez nej tabule ELEN ukážu náhradné bodové písmo. Cesty, meno a adresy
 počítača nahradí na snímkach ukážkovými. Simulátor spustený na tom istom počítači treba zastaviť – inak sú porty
 liniek 4700x obsadené a snímky ukážu iné porty.
@@ -113,18 +114,18 @@ neprihlásený, `403` bez oprávnenia, `404`, `409`, `500`), kódom chyby vo vla
 Kód je stabilný kľúč (`line.endpoint`, `board.notFound`…) – webové rozhranie podľa neho zobrazí text v jazyku obsluhy
 (`error.<kód>` v `web/src/i18n`), `description` je anglický popis pre záznam a klientov bez prekladu.
 
-Novú požiadavku pridáte takto: DTO do `TableSimulator.Contracts`, príkaz alebo dotaz s handlerom (a validátorom) do
-oblasti v `TableSimulator.Application`, trieda `IEndpoint` do `TableSimulator/Api/<oblasť>/` s politikou
+Novú požiadavku pridáte takto: DTO do `StationSimulator.Contracts`, príkaz alebo dotaz s handlerom (a validátorom) do
+oblasti v `StationSimulator.Application`, trieda `IEndpoint` do `StationSimulator/Api/<oblasť>/` s politikou
 `.RequireAuthorization(Permissions.X)` (verejný endpoint výslovne `.AllowAnonymous()` – test
 `KazdyEndpoint_MaPolitikuAleboJeVerejny` endpoint bez jedného z nich odmietne), novú snímku OpenAPI
-(`TABLESIMULATOR_UPDATE_OPENAPI=1 dotnet test … --filter OpenApiTests`, potom vo `web/` `bun run api` vygeneruje klienta)
+(`STATIONSIMULATOR_UPDATE_OPENAPI=1 dotnet test … --filter OpenApiTests`, potom vo `web/` `bun run api` vygeneruje klienta)
 a texty nových kódov chýb do `web/src/i18n`.
 
 Zmena databázy = nová migrácia pre každého poskytovateľa:
 
 ```bash
-dotnet ef migrations add <Nazov> --project TableSimulator.Persistence --startup-project TableSimulator.Persistence --context SqliteAppDbContext --output-dir Migrations/Sqlite
-dotnet ef migrations add <Nazov> --project TableSimulator.Persistence --startup-project TableSimulator.Persistence --context PostgresAppDbContext --output-dir Migrations/Postgres
+dotnet ef migrations add <Nazov> --project StationSimulator.Persistence --startup-project StationSimulator.Persistence --context SqliteAppDbContext --output-dir Migrations/Sqlite
+dotnet ef migrations add <Nazov> --project StationSimulator.Persistence --startup-project StationSimulator.Persistence --context PostgresAppDbContext --output-dir Migrations/Postgres
 ```
 
 PostgreSQL ukladá časy (`timestamptz`) len v UTC – `PostgresAppDbContext` ich pri zápise prevedie, pri čítaní
@@ -142,7 +143,7 @@ pohyblivý text, jas, hodiny). Prehliadač rozhoduje, **ako** to vyzerá. Medzi 
    hlavička, časovanie striedania (predvolene 2 s), blikania (1,0 s svieti / 0,5 s nesvieti) a pohyblivého textu
    (60 bodov/s) – predvolené hodnoty podľa ELEN Monitora a konfigurácie panelov. Upravuje sa v dialógu tabule.
 2. **Vzhľad** – priečinok s `design.json` (vstavané vo `web/public/designs/`, vlastné v
-   `%AppData%\TableSimulator\designs`; rovnaký názov vstavaný prekryje). Zmena súboru sa na tabuliach prejaví hneď.
+   `%AppData%\StationSimulator\designs`; rovnaký názov vstavaný prekryje). Zmena súboru sa na tabuliach prejaví hneď.
    Predvolený je `elen-led` pre tabule ELEN a `lcd-dark` pre znakové tabule Elektročas (ďalej `lcd-green`,
    `lcd-blue`); oba druhy tabúľ kreslí ten istý renderer bodov, takže sa dá použiť ktorýkoľvek vzhľad.
 3. **Písma ELEN** – súbory `.bin` z priečinka písiem (napr. `Sim\FONT` programu ELEN Monitor). Bez písma sa text
@@ -203,7 +204,7 @@ s vysokými číslicami (bit `0x08`) sa medzera, číslice a dvojbodka berú zo 
 Podrobnosti, ktoré používateľská dokumentácia neuvádza:
 
 - **Údaje servera** – všetko je v databáze (SQLite predvolene, voliteľne PostgreSQL – výber v `database.json`
-  mimo databázy, heslo DPAPI pre počítač). Mimo nej ostávajú `recordings\*.tsrec`, `designs\`, `media\`, `https\`,
+  mimo databázy, heslo DPAPI pre počítač). Mimo nej ostávajú `recordings\*.stsrec`, `designs\`, `media\`, `https\`,
   `keys\` a logy. Prvý štart s prázdnou databázou prevezme staré `settings.json` a `config.json` a premenuje ich na
   `*.imported` (poškodený súbor na `*.bad`). Nová databáza PostgreSQL prevezme zo SQLite len nastavenie servera.
   Súbor SQLite pri prechode ostáva bez zmeny – po návrate na SQLite simulátor pokračuje s údajmi, ktoré v ňom boli. Údaje medzi
@@ -213,10 +214,10 @@ Podrobnosti, ktoré používateľská dokumentácia neuvádza:
   prenesenou do súboru SQLite), `designs/`, `media/` a voliteľne `recordings/`. Obnova sa rozbalí do
   `restore.pending` a použije ju `ApplyPendingAsync` v `Program` pred `DatabaseBootstrap`; pôvodné údaje idú do
   `before-restore\<čas>`, výsledok do `restore-result.json`, zlyhaná záloha do `restore.failed-<čas>`.
-- **Záloha informačných panelov** – ZIP so `signage.json` (formát `TableSimulator.Signage` verzia 1) a
+- **Záloha informačných panelov** – ZIP so `signage.json` (formát `StationSimulator.Signage` verzia 1) a
   `media/<32 hex>.<prípona>`; pred zápisom sa overí každá definícia, odkazy aj súbory (`signage.importFormat`,
   `signage.importInvalid`), databáza sa mení v jednej transakcii.
-- **Záznam `.tsrec`** – JSON Lines v UTF-8: hlavička s linkami a tabuľami, potom `{"t":…,"line":…,"rx":"hex"}` od
+- **Záznam `.stsrec`** – JSON Lines v UTF-8: hlavička s linkami a tabuľami, potom `{"t":…,"line":…,"rx":"hex"}` od
   INISSu a `"tx"` odpovede; ukladajú sa bajty, ako prišli. Porovnanie (`RecordingTimeline`, `TimelineDiff` – Myers)
   prehrá oba záznamy naprázdno do vlastného simulátora, zmeny do 1 s sú jeden stav.
 - **Štatistika** – `TrafficCollector` počíta po minútach pod zámkom simulátora, `StatisticsService` zapisuje skončenú

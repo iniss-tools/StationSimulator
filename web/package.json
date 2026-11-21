@@ -1,5 +1,5 @@
 {
-  "name": "table-simulator-web",
+  "name": "station-simulator-web",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -11,7 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "bun test",
-    "e2e:server": "dotnet build ../TableSimulator/TableSimulator.csproj -p:SkipWebBuild=true --artifacts-path e2e/.run/artifacts -nologo -v q",
+    "e2e:server": "dotnet build ../StationSimulator/StationSimulator.csproj -p:SkipWebBuild=true --artifacts-path e2e/.run/artifacts -nologo -v q",
     "e2e": "bun run build && bun run e2e:server && playwright test",
     "docshots": "bun run build && bun run e2e:server && playwright test -c docshots/playwright.config.ts",
     "api": "cd tools/api && bun install && bun run gen"

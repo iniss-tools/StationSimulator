@@ -1,0 +1,8 @@
+<Solution>
+  <Project Path="StationSimulator.Core/StationSimulator.Core.csproj" />
+  <Project Path="StationSimulator.Contracts/StationSimulator.Contracts.csproj" />
+  <Project Path="StationSimulator.Application/StationSimulator.Application.csproj" />
+  <Project Path="StationSimulator.Persistence/StationSimulator.Persistence.csproj" />
+  <Project Path="StationSimulator/StationSimulator.csproj" />
+  <Project Path="StationSimulator.Tests/StationSimulator.Tests.csproj" />
+</Solution>

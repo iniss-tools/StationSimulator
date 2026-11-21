@@ -125,7 +125,7 @@ export async function sendToLine(port: number, frames: number[][]): Promise<numb
 }
 
 /** Zmeny cez API ako web (ochrana proti CSRF). */
-export const API_HEADERS = { "X-Requested-With": "TableSimulator" };
+export const API_HEADERS = { "X-Requested-With": "StationSimulator" };
 
 /** Linka (predvolene ELEN) na TCP porte 47000 + cislo (bez okna - test sa venuje inemu). */
 export async function createLine(page: Page, number: number, name: string, tableClass = 4, manufacturer = "ELEN") {

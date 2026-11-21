@@ -38,7 +38,7 @@ for (const theme of THEMES) {
     await database.getByRole("combobox", { name: "Databáza" }).click();
     await page.getByRole("option", { name: "PostgreSQL" }).click();
     await database.getByLabel("Server").fill("db.stanica.local");
-    await database.getByLabel("Názov databázy").fill("tablesimulator");
+    await database.getByLabel("Názov databázy").fill("stationsimulator");
     await database.getByLabel("Používateľ").fill("simulator");
     await section(page, "database", "databaza/postgres", theme);
   });

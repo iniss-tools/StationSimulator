@@ -1,5 +1,5 @@
-// Vstup aplikacie MCP Apps (vite.mcp.config.ts - jeden subor HTML, ktory server vyda ako ui://tablesimulator/board.html
-// aj ui://tablesimulator/virtual.html; ktora aplikacia sa spusti, urci data-app korena z TableSimulator/Mcp/AppPages.cs).
+// Vstup aplikacie MCP Apps (vite.mcp.config.ts - jeden subor HTML, ktory server vyda ako ui://stationsimulator/board.html
+// aj ui://stationsimulator/virtual.html; ktora aplikacia sa spusti, urci data-app korena z StationSimulator/Mcp/AppPages.cs).
 import { createRoot } from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BoardApp } from "./BoardApp";

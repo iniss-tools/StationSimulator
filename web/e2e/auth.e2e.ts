@@ -30,7 +30,7 @@ test("prvy spravca, odhlasenie a prihlasenie", async ({ page }) => {
 
 test("vlastna rola: menu len so strankami, na ktore ma pouzivatel opravnenie", async ({ page }) => {
   // spravca z predchadzajuceho testu zalozi rolu a pouzivatela cez API
-  const headers = { "X-Requested-With": "TableSimulator" };
+  const headers = { "X-Requested-With": "StationSimulator" };
   expect((await page.request.post("/api/auth/login", { headers, data: { userName: "spravca", password: "heslo-e2e-1", remember: false } })).ok()).toBe(true);
   const role = await page.request.post("/api/roles", { headers, data: { displayName: "Panely", permissions: ["simulator.view", "signage.manage"] } });
   expect(role.ok()).toBe(true);

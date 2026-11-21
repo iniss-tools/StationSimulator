@@ -10,7 +10,7 @@ function bridge() {
 describe("most MCP Apps", () => {
   test("uvodne podanie ruky a jazyk hostitela", async () => {
     const { sent, bridge: b } = bridge();
-    const locale = b.initialize("TableSimulator");
+    const locale = b.initialize("StationSimulator");
     expect(sent[0]).toMatchObject({ id: 1, method: "ui/initialize", params: { protocolVersion: PROTOCOL_VERSION } });
     b.receive({ jsonrpc: "2.0", id: 1, result: { hostContext: { locale: "cs-CZ" } } });
     expect(await locale).toBe("cs-CZ");
@@ -19,7 +19,7 @@ describe("most MCP Apps", () => {
 
   test("pripravenost aj pri chybe podania ruky", async () => {
     const { sent, bridge: b } = bridge();
-    const locale = b.initialize("TableSimulator");
+    const locale = b.initialize("StationSimulator");
     b.receive({ jsonrpc: "2.0", id: 1, error: { code: -32601, message: "nie" } });
     expect(await locale.catch((e: Error) => e.message)).toBe("nie");
     expect(sent.some((m) => m.method === "ui/notifications/initialized")).toBe(true);

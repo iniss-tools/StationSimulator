@@ -20,7 +20,7 @@ if (name === "docshots") {
   writeFileSync(join(data, "settings.json"), JSON.stringify({ httpsPort: Number(port) + 1, ...(fonts ? { fontsFolder: fonts } : {}) }));
 }
 
-const exe = join(here, ".run", "artifacts", "bin", "TableSimulator", "debug", process.platform === "win32" ? "TableSimulator.exe" : "TableSimulator");
+const exe = join(here, ".run", "artifacts", "bin", "StationSimulator", "debug", process.platform === "win32" ? "StationSimulator.exe" : "StationSimulator");
 const server = spawn(exe, ["--no-browser", "--port", port, "--data", data], { stdio: "inherit" });
 const stop = () => server.kill();
 process.on("SIGINT", stop);

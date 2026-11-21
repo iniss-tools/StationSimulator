@@ -1,0 +1,132 @@
+using System.Diagnostics;
+using Serilog;
+using Serilog.Extensions.Logging;
+using StationSimulator.Api;
+using StationSimulator.Application;
+using StationSimulator.Infrastructure;
+using StationSimulator.Infrastructure.Auth;
+using StationSimulator.Infrastructure.Backup;
+using StationSimulator.Infrastructure.Hosting;
+using StationSimulator.Infrastructure.Https;
+using StationSimulator.Infrastructure.Logging;
+using StationSimulator.Infrastructure.Mcp;
+using StationSimulator.Infrastructure.OAuth;
+using StationSimulator.Infrastructure.OpenApi;
+using StationSimulator.Infrastructure.Persistence;
+using StationSimulator.Infrastructure.Realtime;
+using StationSimulator.Infrastructure.Settings;
+using StationSimulator.Application.Settings;
+using StationSimulator.Persistence;
+
+// parametre: --data <priecinok> (nastavenia a databaza), --port <cislo>, --no-browser, --reset-admin [meno] (nove heslo
+// spravcu a koniec), --install-service / --uninstall-service (sluzba Windows a koniec)
+Log.Logger = SerilogSetup.CreateBootstrapLogger();
+// priecinok nastaveni, nad ktorym tento proces drzi zamok - len tam patri dovod neuspesneho startu
+AppPaths? lockedPaths = null;
+try
+{
+    var commandLine = CommandLine.Parse(args, AppContext.BaseDirectory, WindowsService.IsRunning);
+    if (commandLine.InstallService)
+        return await WindowsService.InstallAsync(commandLine, Console.Out);
+    if (commandLine.UninstallService)
+        return WindowsService.Uninstall(Console.Out);
+    var paths = commandLine.Paths;
+    // Nad jednym priecinkom nastaveni bezi jeden server - dalsie spustenie (odkaz v ponuke Start, ked bezi sluzba) len
+    // otvori bieziaci. Zamok sa berie skor, nez sa siahne na databazu (obnova zalohy, migracie).
+    if (!commandLine.ResetAdmin && RunningServer.BelongsToService(paths.DataFolder))
+        return await RunningServer.OpenAsync(paths, commandLine.NoBrowser, service: true);
+    using var serverLock = commandLine.ResetAdmin ? null : ServerLock.TryAcquire(paths.DataFolder);
+    if (!commandLine.ResetAdmin && serverLock is null)
+        return await RunningServer.OpenAsync(paths, commandLine.NoBrowser, service: false);
+    if (serverLock is not null)
+        lockedPaths = paths;
+    if (commandLine.ObsoleteConfig)
+        Log.Warning("Parameter --config je zruseny - linky a tabule su v databaze; subor nahrajte na stranke Linky (Importovat)");
+    // nastavenie je v databaze - treba ho skor, nez sa server zostavi (porty, pristup zo siete, prihlasovanie)
+    using var bootstrapLog = new SerilogLoggerFactory(Log.Logger);
+    // databaza podla database.json v priecinku nastaveni (bez neho SQLite)
+    var database = DatabaseConfig.ToConnection(paths, DatabaseConfig.Load(paths, bootstrapLog.CreateLogger(typeof(DatabaseConfig).FullName!)));
+    // obnova zalohy pripravena z webu - skor, nez sa databaza otvori
+    await ServerBackup.ApplyPendingAsync(paths, database, bootstrapLog.CreateLogger(typeof(ServerBackup).FullName!), DateTimeOffset.Now);
+    var settings = new DbSettingsStore(database,
+        await DatabaseBootstrap.PrepareAsync(paths, database, bootstrapLog.CreateLogger(typeof(DatabaseBootstrap).FullName!)), commandLine.Port);
+    var endpoints = ServerEndpoints.From(settings.Current);
+
+    var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory, WebRootPath = paths.WebRoot });
+    builder.WebHost.ConfigureKestrel(endpoints.Configure);
+    // mimo sluzby Windows bez ucinku
+    builder.Host.UseWindowsService(options => options.ServiceName = WindowsService.Name);
+    builder.Services.AddSerilog((_, logger) => SerilogSetup.Configure(logger, paths));
+    builder.Services.AddProblemDetails();
+    builder.Services.AddInfrastructure(paths, settings, endpoints);
+    builder.Services.AddPersistence(database);
+    builder.Services.AddSingleton(new DatabaseInfo(database.Provider == DatabaseProvider.Postgres ? DatabaseConfig.Postgres : DatabaseConfig.Sqlite,
+        database.Description));
+    builder.Services.AddAuth(paths, new AuthMode(settings.Current.LoginRequired));
+    builder.Services.AddApplication();
+    builder.Services.AddEndpoints(typeof(Program).Assembly);
+    builder.Services.AddApiDocument();
+    builder.Services.AddMcp();
+
+    var app = builder.Build();
+    await DatabaseInitializer.InitializeAsync(app.Services);
+    if (commandLine.ResetAdmin)
+        return await AdminReset.RunAsync(app.Services, commandLine.ResetAdminName, Console.Out);
+    if (endpoints.HttpsEnabled)
+        app.Services.GetRequiredService<HttpsCertificates>().Initialize();
+
+    app.UseServerIdentity(paths);
+    app.UseExceptionHandler();
+    app.UseHttpsForNetwork();
+    app.UseWebSockets();
+    app.UseDefaultFiles();
+    app.UseDesignFiles();
+    app.UseStaticFiles();
+    app.UseSerilogRequestLogging(SerilogSetup.ConfigureRequestLogging);
+    app.UseOAuthCors();
+    app.UseAuthentication();
+    app.UseAuthorization();
+    app.UseCsrfHeader();
+    app.UseUserLogContext();
+    app.MapLiveSocket("/ws");
+    app.MapMcpServer();
+    app.MapOAuth();
+    app.MapApiDocument();
+    app.MapEndpoints(app.MapGroup("/api"));
+    app.MapInissViewFiles();
+
+    app.Lifetime.ApplicationStarted.Register(() =>
+    {
+        Log.Information("StationSimulator: {Url} {HttpsUrl}(nastavenia: {DataFolder}, prihlasovanie: {Login})", endpoints.LocalUrl,
+            endpoints.LocalHttpsUrl is { } https ? https + " " : "", paths.DataFolder,
+            settings.Current.LoginRequired ? "zapnute" : "vypnute - len tento pocitac");
+        StartupError.Clear(paths.DataFolder);
+        serverLock?.Publish(endpoints.LocalUrl);
+        if (!commandLine.NoBrowser)
+            Process.Start(new ProcessStartInfo(endpoints.LocalUrl) { UseShellExecute = true })?.Dispose();
+    });
+    // zamok hned po zastaveni servera, nie az na konci procesu - restart sluzby aj testy spustaju dalsi server hned
+    app.Lifetime.ApplicationStopped.Register(() => serverLock?.Dispose());
+
+    await app.RunAsync();
+    return 0;
+}
+catch (Exception e) when (e is not HostAbortedException)
+{
+    // zaznam servera uz mohol skoncit spolu so serverom (AddSerilog) - dovod ide do konzoly a do logu priecinka nastaveni
+    await Log.CloseAndFlushAsync();
+    Log.Logger = SerilogSetup.CreateFailureLogger(lockedPaths?.LogsFolder);
+    // obsadeny port host zapisal aj s vynimkou ("Hosting failed to start") - tu staci dovod
+    Log.Fatal(StartupError.IsAddressInUse(e) ? null : e, "StationSimulator sa nepodarilo spustit: {Reason}", StartupError.Describe(e));
+    if (lockedPaths is not null)
+        StartupError.Write(lockedPaths.DataFolder, e);
+    ConsoleWindow.PauseIfOwned(Console.Out);
+    return 1;
+}
+finally
+{
+    await Log.CloseAndFlushAsync();
+}
+
+/// <summary>Vstupny bod servera (aj pre testy cez WebApplicationFactory).</summary>
+public partial class Program;

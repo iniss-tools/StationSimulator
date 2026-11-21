@@ -1,7 +1,7 @@
-// Ktory server odpoveda: hlavicka X-TableSimulator-Server s odtlackom pocitaca a priecinka nastaveni (ServerIdentity
+// Ktory server odpoveda: hlavicka X-StationSimulator-Server s odtlackom pocitaca a priecinka nastaveni (ServerIdentity
 // na serveri). Na tej istej adrese moze po case bezat iny server, napr. sluzba namiesto programu v okne - stranka sa
 // vtedy nacita znova, aby obsluha nepracovala s udajmi ineho servera v domneni, ze su povodne.
-const header = "X-TableSimulator-Server";
+const header = "X-StationSimulator-Server";
 const switchedKey = "serverSwitched";
 
 let known: string | null = null;

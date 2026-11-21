@@ -1,6 +1,6 @@
 // Ukazkova hodina statistiky komunikacie pre snimku dokumentacie - server statistiku zapisuje az po skonceni minuty,
 // cisty server by teda nemal co ukazat. Spusta ho demo.ts cez bun (bun:sqlite) s cestou k databaze servera:
-//   bun docshots/statistics.ts <tablesimulator.db>
+//   bun docshots/statistics.ts <stationsimulator.db>
 // Zapise 60 minut pred aktualnou: prevadzku liniek a tabul ukazkovej stanice, chyby, poruchu zo scenara a vypadok
 // linky 2 (INISS sa odpojil a o 3 minuty sa vratil).
 import { Database } from "bun:sqlite";

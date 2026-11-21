@@ -16,7 +16,7 @@ test("vyber databazy a skuska pripojenia", async ({ page }) => {
   await section.getByRole("combobox").click();
   await page.getByRole("option", { name: "PostgreSQL" }).click();
   await expect(section.getByLabel("Server")).toHaveValue("localhost");
-  await expect(section.getByLabel("Názov databázy")).toHaveValue("tablesimulator");
+  await expect(section.getByLabel("Názov databázy")).toHaveValue("stationsimulator");
 
   await section.getByLabel("Server").fill("127.0.0.1");
   await section.getByLabel("Port").fill("1");

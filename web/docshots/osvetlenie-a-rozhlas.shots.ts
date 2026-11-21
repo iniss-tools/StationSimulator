@@ -72,7 +72,7 @@ let polling: ReturnType<typeof setInterval> | undefined;
 
 /** Ukazkove 2 hodiny historie v databaze servera (docshots/device-history.ts cez bun). */
 function seedHistory() {
-  const db = join(import.meta.dirname, "..", "e2e", ".run", DOCSHOTS_SERVER.name, "tablesimulator.db");
+  const db = join(import.meta.dirname, "..", "e2e", ".run", DOCSHOTS_SERVER.name, "stationsimulator.db");
   const result = spawnSync("bun", [join(import.meta.dirname, "device-history.ts"), db], { stdio: "inherit", shell: process.platform === "win32" });
   if (result.status !== 0) throw new Error(`Historia: bun skoncil s kodom ${result.status}`);
 }

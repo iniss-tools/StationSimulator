@@ -18,7 +18,7 @@ export const DEFAULT_VIEW: FaceView = { outlines: true, grid: false, gridStep: 1
 /** Kroky mriezky v ponuke (8 = bunka znaku LCD). */
 export const GRID_STEPS = [1, 2, 4, 5, 8, 10, 16];
 
-const KEY = "tablesimulator.faces.view";
+const KEY = "stationsimulator.faces.view";
 
 /** Ulozene volby; chybajuce alebo nepouzitelne = predvolene. */
 export function loadView(): FaceView {

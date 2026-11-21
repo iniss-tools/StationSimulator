@@ -1,6 +1,6 @@
 // Texty rozhrania - slovencina (predvoleny jazyk).
 export const sk = {
-  "app.title": "Simulátor tabúľ",
+  "app.title": "StationSimulator",
   "nav.boards": "Zariadenia",
   "nav.lines": "Linky",
   "nav.log": "Komunikácia",
@@ -191,7 +191,7 @@ export const sk = {
   "rec.note": "Poznámka",
   "rec.running": "Nahráva sa {name} · {duration} · {entries} kusov · {size}",
   "rec.upload": "Nahrať súbor…",
-  "rec.uploadBad": "Súbor nie je záznam simulátora tabúľ.",
+  "rec.uploadBad": "Súbor nie je záznam StationSimulatora.",
   "rec.empty": "Zatiaľ žiadne záznamy.",
   "rec.col.name": "Záznam",
   "rec.col.created": "Vznikol",

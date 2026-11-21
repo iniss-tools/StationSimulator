@@ -1,7 +1,7 @@
 {
   "openapi": "3.1.1",
   "info": {
-    "title": "TableSimulator API",
+    "title": "StationSimulator API",
     "version": "v1"
   },
   "paths": {

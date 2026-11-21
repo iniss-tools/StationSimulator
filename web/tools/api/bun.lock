@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "table-simulator-api-gen",
+      "name": "station-simulator-api-gen",
       "devDependencies": {
         "@hey-api/openapi-ts": "0.99.0",
         "typescript": "~6.0.2",

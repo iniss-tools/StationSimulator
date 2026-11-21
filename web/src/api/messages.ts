@@ -1,4 +1,4 @@
-// Spravy WebSocketu /ws (TableSimulator.Contracts.Live.LiveMessage) - druh vo vlastnosti "type", obsah su DTO API.
+// Spravy WebSocketu /ws (StationSimulator.Contracts.Live.LiveMessage) - druh vo vlastnosti "type", obsah su DTO API.
 import type { BoardDto, FrameDto, LineDto, RecorderStatusDto, ReplayStatusDto, ReportArchiveEntryDto } from "./generated/types.gen";
 
 export type LiveMessage =

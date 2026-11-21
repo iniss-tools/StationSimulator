@@ -1,4 +1,4 @@
-// Opravnenia a vstavane roly (rovnake kluce ako politiky a roly servera - TableSimulator.Application.Auth).
+// Opravnenia a vstavane roly (rovnake kluce ako politiky a roly servera - StationSimulator.Application.Auth).
 import type { MeDto } from "./generated/types.gen";
 
 export const PERMISSIONS = {

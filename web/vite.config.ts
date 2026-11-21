@@ -8,7 +8,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: { alias: { "@": path.resolve(import.meta.dirname, "./src") } },
   build: {
-    outDir: "../TableSimulator/wwwroot",
+    outDir: "../StationSimulator/wwwroot",
     emptyOutDir: true,
     // kniznice osobitne - menia sa zriedka, prehliadac ich drzi v cache aj po novej verzii rozhrania
     rolldownOptions: {

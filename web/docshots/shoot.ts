@@ -1,4 +1,4 @@
-// Snimka stranky alebo jej casti do dokumentacie: <docs>/static/img/tablesimulator/<nazov>-light.png a -dark.png
+// Snimka stranky alebo jej casti do dokumentacie: <docs>/static/img/stationsimulator/<nazov>-light.png a -dark.png
 // (komponent Screenshot v docs vyberie podla temy webu). Rozhranie je vzdy slovenske.
 import { mkdirSync } from "node:fs";
 import { hostname, networkInterfaces } from "node:os";
@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url";
 import type { Locator, Page } from "@playwright/test";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const OUT = process.env.DOCSHOTS_OUT ?? resolve(here, "..", "..", "..", "iniss-tools-docs", "static", "img", "tablesimulator");
+const OUT = process.env.DOCSHOTS_OUT ?? resolve(here, "..", "..", "..", "iniss-tools-docs", "static", "img", "stationsimulator");
 
 export const THEMES = ["light", "dark"] as const;
 
@@ -32,7 +32,7 @@ interface ShotOptions {
   height?: number;
 }
 
-/** Ulozi snimku `nazov` (cesta pod tablesimulator bez pripony) v danej teme. */
+/** Ulozi snimku `nazov` (cesta pod stationsimulator bez pripony) v danej teme. */
 export async function shot(page: Page, name: string, theme: Theme, options: ShotOptions = {}) {
   if (options.ready) await options.ready.waitFor();
   // animacie a kurzor nech nie su na snimke; nacitane pisma
@@ -75,7 +75,7 @@ const DATA = resolve(here, "..", "e2e", ".run", "docshots");
 const MASKS: [string, string][] = [
   [join(DATA, "iniss-log"), String.raw`C:\INISS\LOG`],
   [join(DATA, "iniss"), String.raw`C:\INISS`],
-  [DATA, String.raw`C:\ProgramData\TableSimulator`],
+  [DATA, String.raw`C:\ProgramData\StationSimulator`],
   ...(process.env.DOCSHOTS_FONTS ? [[process.env.DOCSHOTS_FONTS, String.raw`C:\ELEN\Monitor\Sim\FONT`] as [string, string]] : []),
   [hostname(), "STANICA-PC"],
   ...Object.values(networkInterfaces())

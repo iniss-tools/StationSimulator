@@ -1,4 +1,4 @@
-// Snimky webu simulatora do dokumentacie (iniss-tools-docs/static/img/tablesimulator) proti serveru s ukazkovymi
+// Snimky webu simulatora do dokumentacie (iniss-tools-docs/static/img/stationsimulator) proti serveru s ukazkovymi
 // datami. Spustenie: bun run docshots (zostavi web aj server); len niektore snimky: bun run docshots -g <text>.
 // Prehliadac je nainstalovany Edge; iny cez PLAYWRIGHT_CHANNEL. Kam ukladat: DOCSHOTS_OUT (predvolene repozitar docs vedla).
 import { defineConfig } from "@playwright/test";

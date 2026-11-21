@@ -344,7 +344,7 @@ web/e2e/.run/
 # zdrojove BDF pisiem misc-fixed - stiahne ich web/tools/pixel-fonts/bdf2ts.py
 web/tools/pixel-fonts/.bdf/
 # vystup buildu webu - generuje sa pri dotnet build
-TableSimulator/wwwroot/
+StationSimulator/wwwroot/
 *.tsbuildinfo
 
 # Inno Setup output

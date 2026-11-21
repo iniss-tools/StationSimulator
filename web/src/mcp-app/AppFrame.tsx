@@ -20,7 +20,7 @@ export function AppFrame({ bridge, children }: AppFrameProps) {
       const input = (params as { arguments?: Record<string, unknown> } | undefined)?.arguments;
       if (input) setArgs((current) => current ?? input);
     });
-    void bridge.initialize("TableSimulator").then(
+    void bridge.initialize("StationSimulator").then(
       (locale) => {
         if (locale?.toLowerCase().startsWith("cs")) setLanguage("cs");
       },

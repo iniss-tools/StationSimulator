@@ -1,15 +1,15 @@
-# TableSimulator – pokyny pre agentov
+# StationSimulator – pokyny pre agentov
 
-Simulátor tabúľ INISS (informačný systém železničných staníc) bez desktopovej aplikácie – ovládanie aj zobrazenie
-na webe. Repozitár je súčasťou pracovného priečinka `INISSTools` (nie je git repozitár, každý podpriečinok má vlastné
+Simulátor zariadení stanice pre INISS (informačný systém železničných staníc) – tabule, rozhlas, osvetlenie
+a zosilňovače – bez desktopovej aplikácie, ovládanie aj zobrazenie na webe. Do roku 2026-11 sa volal TableSimulator. Repozitár je súčasťou pracovného priečinka `INISSTools` (nie je git repozitár, každý podpriečinok má vlastné
 repo); `ToolsCore` musí byť naklonovaný vedľa (`..\ToolsCore`, odkazujú sa `ToolsCore.Iniss` a `ToolsCore.Iniss2`).
-GVDEditor odkazuje `TableSimulator.Contracts`. Komunikácia, texty UI aj komentáre v kóde (bez diakritiky) sú slovenské.
+GVDEditor odkazuje `StationSimulator.Contracts`. Komunikácia, texty UI aj komentáre v kóde (bez diakritiky) sú slovenské.
 
 ## Projekty
 
-Menný priestor = cesta priečinka (`TableSimulator.Core/Boards/AkSignal` → `TableSimulator.Core.Boards.AkSignal`).
+Menný priestor = cesta priečinka (`StationSimulator.Core/Boards/AkSignal` → `StationSimulator.Core.Boards.AkSignal`).
 
-### TableSimulator.Core
+### StationSimulator.Core
 
 `net10.0` bez UI a Windows. Všetko beží pod zámkom `Simulation/Simulator`, udalosti (`Simulation/Events`) idú
 von mimo zámku.
@@ -43,8 +43,8 @@ von mimo zámku.
   - `AkSignal/` – ústredne AK Signal servera INISS2 (svetlo a rozhlas): trieda 131 binárny `AKSIGNAL`, 132 textový
     `AKSIGNALUH`, jedna ústredňa na linke (v simulátore adresa 0). Automatiku a ručné svietenie zapína server, tmu
     hlási snímač (`SunTimes` podľa `SimEnvironment.Location`), rozhlas UH má kanály 1 a 2. Testy cez náhradu
-    servera `TableSimulator.Tests/Protocols/AkSignal/IniSrvAkSignal`.
-- `Recording/` – záznam `.tsrec` a `ReplayPlayer` (pauza, rýchlosť a posun cez príkazy pod zámkom a prebudenie
+    servera `StationSimulator.Tests/Protocols/AkSignal/IniSrvAkSignal`.
+- `Recording/` – záznam `.stsrec` a `ReplayPlayer` (pauza, rýchlosť a posun cez príkazy pod zámkom a prebudenie
   slučky). Posun = `Simulator.FastForward`: zmaže tabule liniek záznamu a prehrá správy pred miestom naprázdno bez
   logu, štatistiky a počítadiel. Po dohraní prehrávač čaká, končí len zastavením. Porovnanie záznamov
   `RecordingTimeline` (prehratie naprázdno do vlastného simulátora, zmeny do 1 s = jeden stav) a `TimelineDiff`.
@@ -58,12 +58,12 @@ von mimo zámku.
   `Simulator.SetPower` (`FindBoard` vráti null), výpadok linky `SetLineOutage` (stav `outage`, linka sa nespustí).
 - `Monitor/` – súbory ELEN Monitora.
 
-### TableSimulator.Contracts
+### StationSimulator.Contracts
 
 DTO API a WebSocketu bez logiky a závislostí, jedno v súbore, po oblastiach. Enumy s `JsonStringEnumMemberName`
 a vlastným `JsonConverter`, správy `/ws` polymorfné cez `type`. Používa ich aj GVDEditor.
 
-### TableSimulator.Application
+### StationSimulator.Application
 
 - CQRS bez mediátora podľa vzoru Milana Jovanovića: `ICommand`/`IQuery<T>` + handlery po oblastiach, `Result`/`Error`
   s kódom chyby, registrácia skenovaním (Scrutor). Príkaz alebo dotaz môže byť v jednom súbore so svojím validátorom
@@ -107,7 +107,7 @@ a vlastným `JsonConverter`, správy `/ws` polymorfné cez `type`. Používa ich
   vložené do zostavy (vlastné v DB).
 - `Designs/DesignDefaults` = dvojča `defaultDesignId` vo `web/src/render/design.ts` – meniť oboje.
 
-### TableSimulator.Persistence
+### StationSimulator.Persistence
 
 - EF Core + ASP.NET Core Identity: abstraktný `AppDbContext`, poskytovateľ = podtrieda s vlastnými migráciami –
   `SqliteAppDbContext` (predvolený, `Migrations/Sqlite`) a `PostgresAppDbContext` (časy len UTC,
@@ -118,9 +118,9 @@ a vlastným `JsonConverter`, správy `/ws` polymorfné cez `type`. Používa ich
   medzi databázami; záloha je vždy súbor SQLite), `DatabaseInitializer` pri štarte migruje a zakladá roly,
   `ServerDatabase` otvorí DB aj mimo DI.
 - Linky a tabule `SimulatorConfigRepository` (profil tabule ako JSON stĺpec, enumy kľúčmi zo `SimulatorConfigJson`).
-- Testy PostgreSQL bežia len s premennou `TABLESIMULATOR_TEST_POSTGRES`.
+- Testy PostgreSQL bežia len s premennou `STATIONSIMULATOR_TEST_POSTGRES`.
 
-### Server TableSimulator
+### Server StationSimulator
 
 ASP.NET Core cez `FrameworkReference`, nie Web SDK (`wwwroot` sa kopíruje do výstupu).
 
@@ -140,7 +140,7 @@ ASP.NET Core cez `FrameworkReference`, nie Web SDK (`wwwroot` sa kopíruje do v�
   v `Program` pred `DatabaseBootstrap` (pôvodné do `before-restore\<čas>`).
 - `Infrastructure/Hosting/` – služba Windows (`WindowsService`, `--install-service`, reštart z webu = koniec
   s kódom 3), jeden server nad priečinkom nastavení (`ServerLock`; ďalšie spustenie len otvorí bežiaci server),
-  dôvod neúspešného štartu `StartupError`, odtlačok servera v hlavičke `X-TableSimulator-Server` (`ServerIdentity`),
+  dôvod neúspešného štartu `StartupError`, odtlačok servera v hlavičke `X-StationSimulator-Server` (`ServerIdentity`),
   služby na pozadí:
 
   | Služba | Perióda | Čo robí |
@@ -186,7 +186,7 @@ ASP.NET Core cez `FrameworkReference`, nie Web SDK (`wwwroot` sa kopíruje do v�
   sieť – údaje len cez nástroje `board_view` a `virtual_view` (Visibility App). VS Code posiela výsledok nástroja
   len ako text (aplikácia štartuje z `ui/notifications/tool-input`); rámec bez posuvníka a výška len pri zmene.
   Claude Code MCP Apps nezobrazí.
-- Testy: `McpToolsTests` (pravidlá a snímka `TableSimulator.Tests/Mcp/mcp-tools.json`) a `McpToolsServerTests`
+- Testy: `McpToolsTests` (pravidlá a snímka `StationSimulator.Tests/Mcp/mcp-tools.json`) a `McpToolsServerTests`
   (každý nástroj nad stanicou s údajmi, kontrola voči schéme) – nový nástroj pridať do oboch. Docs
   `referencia/mcp.mdx`.
 
@@ -224,7 +224,7 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   označiť `void`; modul s komponentom neexportuje nič iné (Fast Refresh – pomocníci do `.ts` vedľa); čas počas
   vykresľovania cez `hooks/use-now`, nie `Date.now()`.
 - Koreňový `.gitignore` (šablóna VS) ignoruje priečinky `log`, `bin`, `obj`, `debug`, `release`… – tak nepomenúvať
-  priečinky vo `web/src`. Web zostaví cieľ `BuildWeb` v `TableSimulator.csproj` (zdroje `WebSource` sa zbierajú až
+  priečinky vo `web/src`. Web zostaví cieľ `BuildWeb` v `StationSimulator.csproj` (zdroje `WebSource` sa zbierajú až
   v cieli, inak by ich Rider ukazoval v koreni projektu).
 
 ### Snímky do dokumentácie a e2e
@@ -235,7 +235,7 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   (žiadne absolútne cesty v kóde); údaje do SQLite priamo (`docshots/statistics.ts`, `docshots/device-history.ts`),
   logy INISSu `docshots/iniss-log.ts`, ukážkový server INISS2 `docshots/iniss2-install.ts`. Cesty, meno a adresy
   počítača nahradí `mask()` v `shoot.ts`. Výstup do
-  `iniss-tools-docs/static/img/tablesimulator/<článok>/<snímka>-light|dark.png`.
+  `iniss-tools-docs/static/img/stationsimulator/<článok>/<snímka>-light|dark.png`.
 - Testy prehliadača `e2e/*.e2e.ts` (nie `*.spec.ts` – tie spustí aj bun test): texty podľa SK rozhrania, výber cez
   role a popisy, spoločný server – testy po jednom, každý si zakladá vlastné linky. Správy ako INISS cez
   `e2e/helpers.ts` – trvalé spojenie `openLine` (odpojenie vyvolá upozornenie na výpadok, ktoré prekryje tlačidlá).
@@ -248,7 +248,7 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   vzhľad (`designs/<id>/design.json`, editor `features/designs`), predloha čela a rozloženie virtuálnej tabule sú
   dáta, nie kód.
 - Údaje servera do databázy (Persistence, migrácia pre oboch poskytovateľov), nie do súborov JSON. Ako súbory
-  ostávajú len záznamy `.tsrec`, vlastné vzhľady, certifikáty, kľúče ochrany dát a logy; linky a tabule sa prenášajú
+  ostávajú len záznamy `.stsrec`, vlastné vzhľady, certifikáty, kľúče ochrany dát a logy; linky a tabule sa prenášajú
   exportom/importom (`/api/config`, tvar `SimulatorConfigJson`).
 - Kľúče v JSON explicitne (`JsonStringEnumMemberName`), nie z názvov C#; vlastnosti kontraktov camelCase
   (`JsonSerializerDefaults.Web`) – tvar JSON stráži `ContractsJsonTests`.
@@ -259,7 +259,7 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
 
 ```bash
 # build zostavi aj web (bun); -p:SkipWebBuild=true ho vynecha
-dotnet test TableSimulator.Tests/TableSimulator.Tests.csproj
+dotnet test StationSimulator.Tests/StationSimulator.Tests.csproj
 # renderer; bun run build = typecheck + wwwroot
 cd web && bun test
 # ESLint (balik tools/lint s TS 6) a Prettier; bun run format prepise
@@ -267,12 +267,12 @@ cd web && bun run lint && bun run format:check
 # Playwright v nainstalovanom Edge proti 2 serverom s cistymi datami (e2e/.run)
 cd web && bun run e2e
 # nova snimka web/openapi.json; potom vo web/ bun run api
-TABLESIMULATOR_UPDATE_OPENAPI=1 dotnet test TableSimulator.Tests/TableSimulator.Tests.csproj --filter OpenApiTests
+STATIONSIMULATOR_UPDATE_OPENAPI=1 dotnet test StationSimulator.Tests/StationSimulator.Tests.csproj --filter OpenApiTests
 # nova snimka nastrojov MCP (Mcp/mcp-tools.json)
-TABLESIMULATOR_UPDATE_MCP=1 dotnet test TableSimulator.Tests/TableSimulator.Tests.csproj --filter McpToolsTests
+STATIONSIMULATOR_UPDATE_MCP=1 dotnet test StationSimulator.Tests/StationSimulator.Tests.csproj --filter McpToolsTests
 # instalator: publish len win-x64 do prazdneho priecinka (sluzba Windows, firewall, data pri odinstalovani ostavaju)
-dotnet publish TableSimulator/TableSimulator.csproj -c Release
-"/c/Program Files/Inno Setup 7/ISCC.exe" TableSimulatorInstaller.iss
+dotnet publish StationSimulator/StationSimulator.csproj -c Release
+"/c/Program Files/Inno Setup 7/ISCC.exe" StationSimulatorInstaller.iss
 ```
 
 Vydanie: značka `vX.Y` spustí `.github/workflows/release.yml` (spoločný postup v `ToolsCore/Installer/README.md`).

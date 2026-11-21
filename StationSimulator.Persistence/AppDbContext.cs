@@ -1,0 +1,305 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
+using StationSimulator.Application.Audit;
+using StationSimulator.Application.Faces;
+using StationSimulator.Application.Keys;
+using StationSimulator.Application.OAuth;
+using StationSimulator.Application.Scenarios;
+using StationSimulator.Application.Signage;
+using StationSimulator.Application.Statistics;
+using StationSimulator.Application.Virtual;
+using StationSimulator.Core.Boards;
+using StationSimulator.Core.Lines;
+using StationSimulator.Core.Simulation;
+using StationSimulator.Persistence.Identity;
+using StationSimulator.Persistence.Settings;
+using StationSimulator.Persistence.Simulation;
+
+namespace StationSimulator.Persistence;
+
+/// <summary>
+/// Databaza simulatora: nastavenie servera, linky a tabule, pouzivatelia a roly (ASP.NET Core Identity), pristupove
+/// kluce, audit, virtualne tabule, informacne panely, scenare porucha a statistika komunikacie. Model je nezavisly od poskytovatela - kazdy
+/// poskytovatel ma vlastnu odvodenu triedu a vlastne migracie (<see cref="Sqlite.SqliteAppDbContext" />).
+/// </summary>
+public abstract class AppDbContext(DbContextOptions options) : IdentityDbContext<AppUser, AppRole, Guid>(options)
+{
+    /// <summary>Nastavenie servera (jeden riadok).</summary>
+    public DbSet<SettingsRecord> ServerSettings => Set<SettingsRecord>();
+
+    /// <summary>Linky simulatora.</summary>
+    public DbSet<LineRecord> Lines => Set<LineRecord>();
+
+    /// <summary>Tabule simulatora.</summary>
+    public DbSet<BoardRecord> Boards => Set<BoardRecord>();
+
+    /// <summary>Definicie virtualnych tabul.</summary>
+    public DbSet<VirtualBoard> VirtualBoards => Set<VirtualBoard>();
+
+    /// <summary>Vlastne rozlozenia virtualnych tabul.</summary>
+    public DbSet<VirtualLayoutRecord> VirtualLayouts => Set<VirtualLayoutRecord>();
+
+    /// <summary>Vlastne predlohy ciel tabul.</summary>
+    public DbSet<FaceRecord> Faces => Set<FaceRecord>();
+
+    /// <summary>Audit - kto co urobil.</summary>
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
+
+    /// <summary>Pristupove kluce zariadeni a programov.</summary>
+    public DbSet<AccessKey> AccessKeys => Set<AccessKey>();
+
+    /// <summary>Klienti OAuth pre MCP (dynamicka registracia).</summary>
+    public DbSet<OAuthClient> OAuthClients => Set<OAuthClient>();
+
+    /// <summary>Povolenia OAuth pre MCP - pristup klienta za pouzivatela.</summary>
+    public DbSet<OAuthGrant> OAuthGrants => Set<OAuthGrant>();
+
+    /// <summary>Spravy informacnych panelov.</summary>
+    public DbSet<SignageMessageRecord> SignageMessages => Set<SignageMessageRecord>();
+
+    /// <summary>Playlisty informacnych panelov.</summary>
+    public DbSet<SignagePlaylistRecord> SignagePlaylists => Set<SignagePlaylistRecord>();
+
+    /// <summary>Skupiny informacnych panelov.</summary>
+    public DbSet<SignageGroupRecord> SignageGroups => Set<SignageGroupRecord>();
+
+    /// <summary>Informacne panely (monitory).</summary>
+    public DbSet<SignagePanelRecord> SignagePanels => Set<SignagePanelRecord>();
+
+    /// <summary>Nahrate obrazky a videa sprav.</summary>
+    public DbSet<SignageMediaRecord> SignageMedia => Set<SignageMediaRecord>();
+
+    /// <summary>Minutova statistika komunikacie liniek.</summary>
+    public DbSet<LineTrafficRecord> LineTraffic => Set<LineTrafficRecord>();
+
+    /// <summary>Minutova statistika komunikacie tabul.</summary>
+    public DbSet<BoardTrafficRecord> BoardTraffic => Set<BoardTrafficRecord>();
+
+    /// <summary>Zmeny stavu liniek (pripojenie, odpojenie, vypadok).</summary>
+    public DbSet<LineStatusRecord> LineStatuses => Set<LineStatusRecord>();
+
+    /// <summary>Scenare porucha.</summary>
+    public DbSet<FaultScenarioRecord> FaultScenarios => Set<FaultScenarioRecord>();
+
+    /// <summary>Historia ustredni AK Signal - zmeny stavu svetla.</summary>
+    public DbSet<Application.Devices.LightStateRecord> DeviceLightStates => Set<Application.Devices.LightStateRecord>();
+
+    /// <summary>Historia ustredni AK Signal - skoncene hlasenia.</summary>
+    public DbSet<Application.Devices.AnnouncementRecord> DeviceAnnouncements => Set<Application.Devices.AnnouncementRecord>();
+
+    protected override void OnModelCreating(ModelBuilder builder)
+    {
+        base.OnModelCreating(builder);
+        builder.Entity<AppUser>(user => user.Property(u => u.DisplayName).HasMaxLength(100));
+        builder.Entity<AppRole>(role => role.Property(r => r.DisplayName).HasMaxLength(StationSimulator.Application.Auth.Roles.MaxDisplayName));
+        builder.Entity<SettingsRecord>(settings =>
+        {
+            settings.ToTable("ServerSettings");
+            settings.HasKey(s => s.Id);
+            settings.Property(s => s.Id).ValueGeneratedNever();
+            settings.Property(s => s.FontsFolder).HasMaxLength(500);
+            settings.Property(s => s.DesignsFolder).HasMaxLength(500);
+            settings.Property(s => s.ConnectHost).HasMaxLength(200);
+            settings.Property(s => s.MonitorFolder).HasMaxLength(500);
+            settings.Property(s => s.InissProgram).HasMaxLength(500);
+            settings.Property(s => s.InissViewFolder).HasMaxLength(500).HasDefaultValue("");
+            settings.Property(s => s.InissRegistry).HasMaxLength(100);
+            settings.Property(s => s.HttpsCertificate).HasMaxLength(500);
+            settings.Property(s => s.HttpsKey).HasMaxLength(500);
+            settings.Property(s => s.HttpsPassword).HasMaxLength(2000);
+            settings.Property(s => s.Alerts).HasMaxLength(8000).HasDefaultValue("");
+        });
+        // enumy jadra ako kluce z JSON (display, noReply…), nie mena C#
+        builder.Entity<LineRecord>(line =>
+        {
+            line.ToTable("Lines");
+            line.HasKey(l => l.Number);
+            line.Property(l => l.Number).ValueGeneratedNever();
+            line.Property(l => l.Endpoint).HasMaxLength(200);
+            line.Property(l => l.Name).HasMaxLength(100);
+            line.Property(l => l.Mode).HasMaxLength(20).HasConversion(m => SimulatorConfigJson.Key(m), k => SimulatorConfigJson.Parse<LineMode>(k));
+            line.Property(l => l.Manufacturer).HasMaxLength(40);
+            line.Property(l => l.Mirror).HasMaxLength(100);
+            line.HasMany(l => l.Boards).WithOne().HasForeignKey(b => b.Line).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<BoardRecord>(board =>
+        {
+            board.ToTable("Boards");
+            board.HasKey(b => new { b.Line, b.Address });
+            board.Property(b => b.Address).ValueGeneratedNever();
+            board.Property(b => b.Manufacturer).HasMaxLength(40);
+            board.Property(b => b.Name).HasMaxLength(100);
+            board.Property(b => b.Profile).HasConversion(p => ProfileJson.Write(p), j => ProfileJson.Read(j));
+            board.Property(b => b.Design).HasMaxLength(100);
+            board.Property(b => b.FaultKind).HasMaxLength(20).HasConversion(f => SimulatorConfigJson.Key(f), k => SimulatorConfigJson.Parse<FaultKind>(k));
+        });
+        builder.Entity<VirtualBoard>(board =>
+        {
+            board.ToTable("VirtualBoards");
+            // cislo zadava obsluha (ako v INISSView) - adresa zobrazenia sa nemeni
+            board.HasKey(b => b.Id);
+            board.Property(b => b.Id).ValueGeneratedNever();
+            board.Property(b => b.Name).HasMaxLength(100);
+            board.Property(b => b.Description).HasMaxLength(200);
+            board.Property(b => b.Source).HasMaxLength(100);
+            board.Property(b => b.Separator).HasMaxLength(20);
+            board.Property(b => b.Template).HasMaxLength(100);
+            board.Property(b => b.Parameter).HasMaxLength(200);
+            board.Property(b => b.Layout).HasMaxLength(40).HasDefaultValue("");
+        });
+        builder.Entity<AuditEntry>(entry =>
+        {
+            entry.ToTable("AuditEntries");
+            entry.HasKey(e => e.Id);
+            entry.Property(e => e.Id).ValueGeneratedOnAdd();
+            entry.Property(e => e.User).HasMaxLength(64);
+            entry.Property(e => e.Action).HasMaxLength(64);
+            entry.Property(e => e.Target).HasMaxLength(200);
+            entry.Property(e => e.Error).HasMaxLength(100);
+            entry.Property(e => e.Details).HasMaxLength(4000);
+            entry.Property(e => e.Address).HasMaxLength(64);
+            entry.HasIndex(e => e.Time);
+        });
+        builder.Entity<AccessKey>(key =>
+        {
+            key.ToTable("AccessKeys");
+            key.HasKey(k => k.Id);
+            key.Property(k => k.Name).HasMaxLength(100);
+            key.Property(k => k.Kind).HasMaxLength(10);
+            key.Property(k => k.Role).HasMaxLength(20);
+            key.Property(k => k.Prefix).HasMaxLength(20);
+            key.Property(k => k.Hash).HasMaxLength(64);
+            key.Property(k => k.CreatedBy).HasMaxLength(64);
+            key.HasIndex(k => k.Hash).IsUnique();
+        });
+        builder.Entity<OAuthClient>(client =>
+        {
+            client.ToTable("OAuthClients");
+            client.HasKey(c => c.Id);
+            client.Property(c => c.Id).HasMaxLength(32);
+            client.Property(c => c.Name).HasMaxLength(100);
+        });
+        builder.Entity<OAuthGrant>(grant =>
+        {
+            grant.ToTable("OAuthGrants");
+            grant.HasKey(g => g.Id);
+            grant.Property(g => g.ClientId).HasMaxLength(32);
+            grant.Property(g => g.ClientName).HasMaxLength(100);
+            grant.Property(g => g.UserName).HasMaxLength(64);
+            grant.Property(g => g.Role).HasMaxLength(20);
+            grant.Property(g => g.AccessHash).HasMaxLength(64);
+            grant.Property(g => g.RefreshHash).HasMaxLength(64);
+            grant.Property(g => g.PreviousRefreshHash).HasMaxLength(64);
+            grant.HasIndex(g => g.AccessHash).IsUnique();
+            grant.HasIndex(g => g.RefreshHash).IsUnique();
+            grant.HasIndex(g => g.PreviousRefreshHash);
+            // zrusenie klienta zrusi aj jeho povolenia
+            grant.HasOne<OAuthClient>().WithMany().HasForeignKey(g => g.ClientId).OnDelete(DeleteBehavior.Cascade);
+        });
+        builder.Entity<VirtualLayoutRecord>(layout =>
+        {
+            layout.ToTable("VirtualLayouts");
+            layout.HasKey(l => l.Id);
+            layout.Property(l => l.Id).HasMaxLength(40);
+            layout.Property(l => l.Name).HasMaxLength(100);
+        });
+        builder.Entity<FaceRecord>(face =>
+        {
+            face.ToTable("BoardFaces");
+            face.HasKey(f => f.Id);
+            face.Property(f => f.Id).HasMaxLength(40);
+            face.Property(f => f.Name).HasMaxLength(100);
+        });
+        // statistika: minuta od 1. 1. 1970 UTC ako cislo - porovnava sa a zoskupuje v kazdej databaze rovnako
+        builder.Entity<LineTrafficRecord>(traffic =>
+        {
+            traffic.ToTable("LineTraffic");
+            traffic.HasKey(t => new { t.Line, t.Minute });
+            traffic.HasIndex(t => t.Minute);
+        });
+        builder.Entity<BoardTrafficRecord>(traffic =>
+        {
+            traffic.ToTable("BoardTraffic");
+            traffic.HasKey(t => new { t.Line, t.Address, t.Minute });
+            traffic.HasIndex(t => t.Minute);
+        });
+        builder.Entity<LineStatusRecord>(status =>
+        {
+            status.ToTable("LineStatusChanges");
+            status.HasKey(s => s.Id);
+            status.Property(s => s.Id).ValueGeneratedOnAdd();
+            status.Property(s => s.Status).HasMaxLength(20);
+            status.Property(s => s.Detail).HasMaxLength(200);
+            // zmien stavu je malo (desiatky za den) - staci index casu
+            status.HasIndex(s => s.TimeMs);
+        });
+        // historia ustredni AK Signal: cas v ms od 1. 1. 1970 UTC ako cislo - porovnava sa v kazdej databaze rovnako
+        builder.Entity<Application.Devices.LightStateRecord>(state =>
+        {
+            state.ToTable("DeviceLightStates");
+            state.HasKey(s => s.Id);
+            state.Property(s => s.Id).ValueGeneratedOnAdd();
+            state.HasIndex(s => new { s.Line, s.Address, s.TimeMs });
+            state.HasIndex(s => s.TimeMs);
+        });
+        builder.Entity<Application.Devices.AnnouncementRecord>(announcement =>
+        {
+            announcement.ToTable("DeviceAnnouncements");
+            announcement.HasKey(a => a.Id);
+            announcement.Property(a => a.Id).ValueGeneratedOnAdd();
+            announcement.Property(a => a.Result).HasMaxLength(20);
+            announcement.Property(a => a.Sounds).HasMaxLength(Application.Devices.DeviceHistoryRetention.MaxSounds);
+            announcement.Property(a => a.Title).HasMaxLength(Application.Devices.DeviceHistoryRetention.MaxTitle);
+            announcement.Property(a => a.Queue).HasMaxLength(Application.Devices.DeviceHistoryRetention.MaxName);
+            announcement.Property(a => a.Circuit).HasMaxLength(Application.Devices.DeviceHistoryRetention.MaxName);
+            announcement.HasIndex(a => a.StartMs);
+            announcement.HasIndex(a => a.EndMs);
+        });
+        // kroky scenara su JSON ako v API - scenarov je malo a citaju sa vzdy cele
+        builder.Entity<FaultScenarioRecord>(scenario =>
+        {
+            scenario.ToTable("FaultScenarios");
+            scenario.HasKey(s => s.Id);
+            scenario.Property(s => s.Id).ValueGeneratedOnAdd();
+            scenario.Property(s => s.Name).HasMaxLength(100);
+        });
+        // obsah sprav, playlistov a skupin je JSON ako v API - je ich malo a citaju sa vzdy vsetky
+        builder.Entity<SignageMessageRecord>(message =>
+        {
+            message.ToTable("SignageMessages");
+            message.HasKey(m => m.Id);
+            message.Property(m => m.Id).ValueGeneratedOnAdd();
+            message.Property(m => m.Name).HasMaxLength(100);
+        });
+        builder.Entity<SignagePlaylistRecord>(playlist =>
+        {
+            playlist.ToTable("SignagePlaylists");
+            playlist.HasKey(p => p.Id);
+            playlist.Property(p => p.Id).ValueGeneratedOnAdd();
+            playlist.Property(p => p.Name).HasMaxLength(100);
+        });
+        builder.Entity<SignageGroupRecord>(group =>
+        {
+            group.ToTable("SignageGroups");
+            group.HasKey(g => g.Id);
+            group.Property(g => g.Id).ValueGeneratedOnAdd();
+            group.Property(g => g.Name).HasMaxLength(100);
+        });
+        builder.Entity<SignagePanelRecord>(panel =>
+        {
+            panel.ToTable("SignagePanels");
+            panel.HasKey(p => p.Id);
+            panel.Property(p => p.Id).ValueGeneratedOnAdd();
+            panel.Property(p => p.Name).HasMaxLength(100);
+            panel.Property(p => p.Note).HasMaxLength(500);
+        });
+        builder.Entity<SignageMediaRecord>(media =>
+        {
+            media.ToTable("SignageMedia");
+            media.HasKey(m => m.Id);
+            media.Property(m => m.Name).HasMaxLength(200);
+            media.Property(m => m.ContentType).HasMaxLength(50);
+            media.Property(m => m.FileName).HasMaxLength(60);
+        });
+    }
+}

@@ -1,0 +1,16 @@
+using Microsoft.AspNetCore.Routing;
+using StationSimulator.Application.Abstractions.Messaging;
+using StationSimulator.Application.Auth;
+using StationSimulator.Application.Lines;
+
+namespace StationSimulator.Api.Lines;
+
+/// <summary>DELETE /api/lines/{number} - odstrani linku aj s tabulami.</summary>
+public sealed class DeleteLine : IEndpoint
+{
+    public void MapEndpoint(IEndpointRouteBuilder app) =>
+        app.MapDelete("lines/{number:int}", async (int number, ICommandHandler<DeleteLineCommand> handler, CancellationToken cancellationToken) =>
+            (await handler.Handle(new DeleteLineCommand(number), cancellationToken)).Match(Results.NoContent, CustomResults.Problem))
+            .Produces(StatusCodes.Status204NoContent)
+            .RequireAuthorization(Permissions.LinesManage);
+}

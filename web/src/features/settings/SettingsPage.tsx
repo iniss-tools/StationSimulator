@@ -208,7 +208,7 @@ export function SettingsPage() {
             <FormField
               label={<AfterRestart>{t("settings.designsFolder")}</AfterRestart>}
               hint={
-                <Hint text={t("settings.designsFolder.hint", { folder: "%AppData%\\TableSimulator\\designs" })} found={<DesignsFound designs={designs} />} />
+                <Hint text={t("settings.designsFolder.hint", { folder: "%AppData%\\StationSimulator\\designs" })} found={<DesignsFound designs={designs} />} />
               }
             >
               <Input value={form.designsFolder} onChange={(e) => change({ designsFolder: e.target.value })} />

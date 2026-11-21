@@ -1,10 +1,10 @@
 // Pristupovy kluc zariadenia a hlavicky poziadaviek - bez zavislosti (pouziva ho aj renderer).
 
 /** Hlavicka proti CSRF - server bez nej odmietne kazdu zmenu. */
-export const CSRF_HEADER = { "X-Requested-With": "TableSimulator" };
+export const CSRF_HEADER = { "X-Requested-With": "StationSimulator" };
 
 const KEY_PARAM = "key";
-const KEY_STORAGE = "tableSimulator.accessKey";
+const KEY_STORAGE = "stationSimulator.accessKey";
 
 /**
  * Pristupovy kluc zariadenia z odkazu (?key=...): ulozi sa do relacie karty a z adresy zmizne, aby nebol vidno.

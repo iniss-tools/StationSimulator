@@ -294,7 +294,7 @@ const VIRTUAL: (SetVirtualBoardRequest & { id: number })[] = [
 
 /** Ukazkova hodina statistiky v databaze servera (docshots/statistics.ts cez bun). */
 function seedStatistics() {
-  const db = join(DATA, "tablesimulator.db");
+  const db = join(DATA, "stationsimulator.db");
   const result = spawnSync("bun", [join(import.meta.dirname, "statistics.ts"), db], { stdio: "inherit", shell: process.platform === "win32" });
   if (result.status !== 0) throw new Error(`Statistika: bun skoncil s kodom ${result.status}`);
 }

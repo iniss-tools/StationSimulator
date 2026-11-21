@@ -1,0 +1,14 @@
+using FluentValidation;
+using StationSimulator.Application.Recordings;
+
+namespace StationSimulator.Application.Replay;
+
+public sealed class PlayRecordingCommandValidator : AbstractValidator<PlayRecordingCommand>
+{
+    public PlayRecordingCommandValidator()
+    {
+        RuleFor(c => c.Name).Must(RecordingNames.IsValid).WithErrorCode(RecordingErrors.Name);
+        RuleFor(c => c.Speed).InclusiveBetween(0, 1000).WithErrorCode(RecordingErrors.Speed);
+        RuleFor(c => c.Position).GreaterThanOrEqualTo(0).WithErrorCode(RecordingErrors.Time);
+    }
+}

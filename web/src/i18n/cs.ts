@@ -2,7 +2,7 @@
 import type { TextKey } from "./sk";
 
 export const cs: Record<TextKey, string> = {
-  "app.title": "Simulátor tabulí",
+  "app.title": "StationSimulator",
   "nav.boards": "Zařízení",
   "nav.lines": "Linky",
   "nav.log": "Komunikace",
@@ -193,7 +193,7 @@ export const cs: Record<TextKey, string> = {
   "rec.note": "Poznámka",
   "rec.running": "Nahrává se {name} · {duration} · {entries} kusů · {size}",
   "rec.upload": "Nahrát soubor…",
-  "rec.uploadBad": "Soubor není záznam simulátoru tabulí.",
+  "rec.uploadBad": "Soubor není záznam StationSimulatoru.",
   "rec.empty": "Zatím žádné záznamy.",
   "rec.col.name": "Záznam",
   "rec.col.created": "Vznikl",

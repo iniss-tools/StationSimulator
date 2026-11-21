@@ -76,7 +76,7 @@ export function ServerSection({
   const restart = useRestartServer();
   const can = useCan();
   const canRestart = can(PERMISSIONS.server);
-  const install = info && `TableSimulator.exe --install-service --data "${info.dataFolder}"`;
+  const install = info && `StationSimulator.exe --install-service --data "${info.dataFolder}"`;
   const check = useMutation({
     ...checkServerUpdateMutation(),
     onSuccess: (result) => queryClient.setQueryData(getServerUpdateQueryKey(), result),

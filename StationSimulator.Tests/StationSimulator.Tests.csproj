@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<RootNamespace>StationSimulator.Tests</RootNamespace>
+		<AssemblyName>StationSimulator.Tests</AssemblyName>
+		<IsPackable>false</IsPackable>
+		<LangVersion>default</LangVersion>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.9.0" />
+		<PackageReference Include="MSTest.TestAdapter" Version="4.4.0" />
+		<PackageReference Include="MSTest.TestFramework" Version="4.4.0" />
+		<PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+		<PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.12" />
+		<!-- testy servera (prihlasenie, opravnenia) cez TestServer -->
+		<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.12" />
+	</ItemGroup>
+	<ItemGroup>
+		<ProjectReference Include="..\StationSimulator.Core\StationSimulator.Core.csproj" />
+		<ProjectReference Include="..\StationSimulator.Contracts\StationSimulator.Contracts.csproj" />
+		<ProjectReference Include="..\StationSimulator.Application\StationSimulator.Application.csproj" />
+		<ProjectReference Include="..\StationSimulator.Persistence\StationSimulator.Persistence.csproj" />
+		<ProjectReference Include="..\StationSimulator\StationSimulator.csproj" />
+	</ItemGroup>
+</Project>

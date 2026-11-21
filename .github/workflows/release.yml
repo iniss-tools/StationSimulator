@@ -1,4 +1,4 @@
-# Vydanie simulatora tabul: znacka vX.Y (git tag -a v1.10 -m "Co je nove" && git push origin v1.10) alebo nove vydanie
+# Vydanie StationSimulatora: znacka vX.Y (git tag -a v1.10 -m "Co je nove" && git push origin v1.10) alebo nove vydanie
 # so znackou vX.Y zalozene na GitHube zostavi instalator a zverejni ho. Postup je v ToolsCore/Installer/README.md.
 name: Vydanie
 
@@ -18,9 +18,9 @@ jobs:
   release:
     uses: iniss-tools/ToolsCore/.github/workflows/release-app.yml@main
     with:
-      program: TableSimulator
+      program: StationSimulator
       tag: ${{ inputs.tag || github.ref_name }}
-      project: TableSimulator/TableSimulator/TableSimulator.csproj
-      installer: TableSimulator/TableSimulatorInstaller.iss
+      project: StationSimulator/StationSimulator/StationSimulator.csproj
+      installer: StationSimulator/StationSimulatorInstaller.iss
       publish: true
       bun: true
