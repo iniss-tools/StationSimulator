@@ -1,7 +1,7 @@
 // Platno schemy stanice: kresba a znacky zariadeni v SVG, zivy obsah tabul ako vrstva nad nim. Rozmery v jednotkach
 // platna, na stranke sa cele platno prisposobi sirke miesta.
 import type { KeyboardEvent } from "react";
-import { Cable, Lightbulb, Speaker, Volume2, type LucideIcon } from "lucide-react";
+import { Cable, Lightbulb, Monitor, Speaker, Volume2, type LucideIcon } from "lucide-react";
 import type { SchemaElementDto, StationSchemaDto } from "@/api";
 import { BoardView } from "@/features/boards/BoardView";
 import { cn } from "@/lib/utils";
@@ -21,8 +21,10 @@ import {
 interface Props {
   schema: Pick<StationSchemaDto, "width" | "height" | "elements">;
   live: SchemaLive;
-  /** Obrazok pozadia pod kresbou (cely do platna so zachovanim pomeru stran). */
+  /** Obrazok pozadia pod kresbou (cely do svojej plochy so zachovanim pomeru stran). */
   background?: SchemaBackground | null;
+  /** Tabule ako znacky s nazvom a stavom namiesto ziveho obsahu. */
+  symbols?: boolean;
   /** Vybrany prvok (otvoreny detail). */
   selected?: number | null;
   /** Kliknutie na zariadenie; bez obsluhy sa prvky nedaju vybrat. */
@@ -42,7 +44,16 @@ const TONES: Record<ElementTone, string> = {
   missing: "fill-transparent stroke-muted-foreground/60 [stroke-dasharray:6_4]",
 };
 
-const ICONS: Partial<Record<SchemaElementDto["kind"], LucideIcon>> = { audio: Volume2, light: Lightbulb, amplifier: Speaker, commLine: Cable };
+const ICONS: Partial<Record<SchemaElementDto["kind"], LucideIcon>> = { board: Monitor, audio: Volume2, light: Lightbulb, amplifier: Speaker, commLine: Cable };
+
+// farba textu stavu pod nazvom zariadenia
+const STATE_TEXT: Record<ElementTone, string> = {
+  ok: "fill-muted-foreground",
+  active: "fill-emerald-600 dark:fill-emerald-400",
+  bad: "fill-red-600 dark:fill-red-400",
+  off: "fill-muted-foreground",
+  missing: "fill-muted-foreground",
+};
 
 const points = (element: SchemaElementDto) => element.points.map((p) => `${p.x},${p.y}`).join(" ");
 
@@ -129,8 +140,10 @@ interface DeviceProps {
 function Device({ element: e, state, label, selected, live, onSelect }: DeviceProps) {
   const Icon = ICONS[e.kind];
   const size = e.size || FONT;
-  const icon = Math.min(e.height - 8, size * 1.3);
+  const icon = Math.max(0, Math.min(e.height - 8, size * 1.3));
   const lit = e.kind === "light" && state.tone === "active";
+  // vyssia znacka ma pod nazvom aj stav
+  const twoLines = !live && e.height >= size * 2.4;
   const title = `${label} – ${t(`schema.state.${state.reason}`)}`;
   const keyDown = (event: KeyboardEvent) => {
     if (event.key !== "Enter" && event.key !== " ") return;
@@ -175,24 +188,35 @@ function Device({ element: e, state, label, selected, live, onSelect }: DevicePr
           )}
           <text
             x={e.x + (Icon ? icon + 12 : 8)}
-            y={e.y + e.height / 2}
+            y={e.y + e.height / 2 - (twoLines ? size * 0.5 : 0)}
             fontSize={size}
             dominantBaseline="central"
             className={state.tone === "off" || state.tone === "missing" ? "fill-muted-foreground" : "fill-foreground"}
           >
             {label}
           </text>
+          {twoLines && (
+            <text
+              x={e.x + (Icon ? icon + 12 : 8)}
+              y={e.y + e.height / 2 + size * 0.65}
+              fontSize={size * 0.8}
+              dominantBaseline="central"
+              className={lit ? "fill-amber-600 dark:fill-amber-400" : STATE_TEXT[state.tone]}
+            >
+              {t(`schema.state.${state.reason}`)}
+            </text>
+          )}
         </>
       )}
     </g>
   );
 }
 
-export function SchemaCanvas({ schema, live, background, selected, onSelect, className }: Props) {
+export function SchemaCanvas({ schema, live, background, symbols = false, selected, onSelect, className }: Props) {
   const percent = (value: number, of: number) => `${(value / of) * 100}%`;
   const devices = schema.elements.filter((e) => isDevice(e.kind)).map((e) => ({ element: e, state: elementState(e, live), board: boardOf(e, live.boards) }));
   // zivy obsah maju tabule, ktore v simulatore su a nie su vypnute
-  const liveBoards = devices.filter((d) => d.element.kind === "board" && d.element.view === "live" && d.board && d.state.tone !== "off");
+  const liveBoards = symbols ? [] : devices.filter((d) => d.element.kind === "board" && d.element.view === "live" && d.board && d.state.tone !== "off");
   const isLive = (id: number) => liveBoards.some((d) => d.element.id === id);
 
   return (
@@ -204,16 +228,22 @@ export function SchemaCanvas({ schema, live, background, selected, onSelect, cla
         {background && (
           <image
             href={background.href}
-            x={0}
-            y={0}
-            width={schema.width}
-            height={schema.height}
+            x={background.x}
+            y={background.y}
+            width={background.width}
+            height={background.height}
             opacity={background.opacity}
             preserveAspectRatio="xMidYMid meet"
           />
         )}
         {schema.elements.map((e) => {
-          if (!isDevice(e.kind)) return <Drawing key={e.id} element={e} />;
+          if (!isDevice(e.kind))
+            return (
+              // kresba polozena nad zariadenim mu neberie kliknutia
+              <g key={e.id} className="pointer-events-none">
+                <Drawing element={e} />
+              </g>
+            );
           const state = elementState(e, live);
           return (
             <Device key={e.id} element={e} state={state} label={elementLabel(e, live)} selected={selected === e.id} live={isLive(e.id)} onSelect={onSelect} />

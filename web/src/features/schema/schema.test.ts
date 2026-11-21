@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import type { AnnouncementDto, BoardDto, LineDto, SchemaElementDto, SchemaElementKind } from "@/api";
-import { autoLayout, boardOf, elementLabel, elementState } from "./schema";
+import { autoLayout, backgroundAt, backgroundBox, boardOf, elementLabel, elementState, toRequest } from "./schema";
 
 const element = (kind: SchemaElementKind, patch: Partial<SchemaElementDto> = {}): SchemaElementDto => ({
   id: 1,
@@ -148,5 +148,28 @@ describe("navrh rozmiestnenia", () => {
     const schema = autoLayout("Stanica", { lines: [line(1)], boards }, 800);
     expect(schema.elements.every((e) => e.x + e.width <= 800)).toBe(true);
     expect(new Set(schema.elements.filter((e) => e.kind === "board").map((e) => e.y)).size).toBeGreaterThan(1);
+  });
+});
+
+describe("obrazok pozadia", () => {
+  const placement = { width: 1600, height: 800, backgroundOpacity: 0.4, backgroundX: 0, backgroundY: 0, backgroundWidth: 0, backgroundHeight: 0 };
+
+  test("bez vlastnej plochy zabera cele platno", () => {
+    expect(backgroundBox(placement)).toEqual({ x: 0, y: 0, width: 1600, height: 800 });
+    expect(backgroundBox({ ...placement, backgroundX: 50, backgroundWidth: 300 })).toEqual({ x: 0, y: 0, width: 1600, height: 800 });
+  });
+
+  test("vlastna plocha ma polohu aj rozmer", () => {
+    const placed = { ...placement, backgroundX: -20, backgroundY: 30, backgroundWidth: 900, backgroundHeight: 450 };
+    expect(backgroundBox(placed)).toEqual({ x: -20, y: 30, width: 900, height: 450 });
+    expect(backgroundAt("/obrazok", placed)).toEqual({ href: "/obrazok", opacity: 0.4, x: -20, y: 30, width: 900, height: 450 });
+    expect(backgroundAt(null, placed)).toBeNull();
+  });
+
+  test("definicia schemy je bez pracovnych udajov editora", () => {
+    const draft = { name: "S", elements: [], ...placement, image: "remove", id: 5, background: "abc" };
+    expect(Object.keys(toRequest(draft)).sort()).toEqual(
+      ["backgroundHeight", "backgroundOpacity", "backgroundWidth", "backgroundX", "backgroundY", "elements", "height", "name", "width"].sort(),
+    );
   });
 });

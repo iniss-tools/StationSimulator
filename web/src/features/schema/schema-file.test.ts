@@ -2,7 +2,17 @@ import { describe, expect, test } from "bun:test";
 import type { StationSchemaRequest } from "@/api";
 import { backgroundFileName, fromBase64, parseSchemaFile, schemaFileName, toBase64, toSchemaFile } from "./schema-file";
 
-const schema: StationSchemaRequest = { name: "Nástupištia", width: 800, height: 400, elements: [], backgroundOpacity: 0.4 };
+const schema: StationSchemaRequest = {
+  name: "Nástupištia",
+  width: 800,
+  height: 400,
+  elements: [],
+  backgroundOpacity: 0.4,
+  backgroundX: 0,
+  backgroundY: 0,
+  backgroundWidth: 0,
+  backgroundHeight: 0,
+};
 
 describe("subor so schemou", () => {
   test("export a import vratia rovnaku schemu aj obrazok", () => {

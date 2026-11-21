@@ -40,6 +40,9 @@ public sealed class StationSchemaValidatorTests
         CollectionAssert.Contains(Codes(Schema() with { Width = 99 }), SchemaErrors.Size);
         CollectionAssert.Contains(Codes(Schema() with { Height = 20_001 }), SchemaErrors.Size);
         CollectionAssert.Contains(Codes(Schema() with { BackgroundOpacity = 1.5 }), SchemaErrors.Opacity);
+        CollectionAssert.Contains(Codes(Schema() with { BackgroundWidth = -1 }), SchemaErrors.BackgroundBox);
+        CollectionAssert.Contains(Codes(Schema() with { BackgroundX = 1e9 }), SchemaErrors.BackgroundBox);
+        CollectionAssert.AreEqual(Array.Empty<string>(), Codes(Schema() with { BackgroundX = -50, BackgroundY = 20, BackgroundWidth = 800, BackgroundHeight = 400 }));
     }
 
     [TestMethod]

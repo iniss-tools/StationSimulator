@@ -72,7 +72,7 @@ function demoSchema(boards: BoardDto[]): StationSchemaRequest {
     ...amplifiers.map((a, i) => device("amplifier", a, 60, 590 + i * 56, 240, 44)),
     ...[1, 2, 3, 4, 5, 6].map((line, i) => element("commLine", 60 + i * 250, 740, 236, 28, { line })),
   ];
-  return { name: NAME, width: 1600, height: 800, elements, backgroundOpacity: 0.5 };
+  return { name: NAME, width: 1600, height: 800, elements, backgroundOpacity: 0.5, backgroundX: 0, backgroundY: 0, backgroundWidth: 0, backgroundHeight: 0 };
 }
 
 let schemaId = 0;
@@ -109,6 +109,13 @@ for (const theme of THEMES) {
     await expect(detail.locator("canvas")).toHaveCount(1);
     await page.waitForTimeout(500);
     await shot(page, "schema-stanice/detail", theme);
+
+    // tabule ako znacky s nazvom a stavom
+    await page.keyboard.press("Escape");
+    await expect(detail).toBeHidden();
+    await page.getByRole("button", { name: "Značky" }).click();
+    await expect(page.locator("main canvas")).toHaveCount(0);
+    await shot(page, "schema-stanice/znacky", theme);
   });
 
   test(`editor schemy (${theme})`, async ({ page }) => {

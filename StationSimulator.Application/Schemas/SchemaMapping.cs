@@ -22,7 +22,12 @@ public static class SchemaMapping
         var definition = Deserialize(record.Definition);
         return new StationSchemaDto(record.Id, record.Name, definition.Width, definition.Height, definition.Elements)
         {
-            Background = background, BackgroundOpacity = definition.BackgroundOpacity
+            Background = background,
+            BackgroundOpacity = definition.BackgroundOpacity,
+            BackgroundX = definition.BackgroundX,
+            BackgroundY = definition.BackgroundY,
+            BackgroundWidth = definition.BackgroundWidth,
+            BackgroundHeight = definition.BackgroundHeight
         };
     }
 }

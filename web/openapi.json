@@ -11129,7 +11129,11 @@
           "height",
           "elements",
           "background",
-          "backgroundOpacity"
+          "backgroundOpacity",
+          "backgroundX",
+          "backgroundY",
+          "backgroundWidth",
+          "backgroundHeight"
         ],
         "type": "object",
         "properties": {
@@ -11163,6 +11167,22 @@
           "backgroundOpacity": {
             "type": "number",
             "format": "double"
+          },
+          "backgroundX": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundY": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundWidth": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundHeight": {
+            "type": "number",
+            "format": "double"
           }
         }
       },
@@ -11172,7 +11192,11 @@
           "width",
           "height",
           "elements",
-          "backgroundOpacity"
+          "backgroundOpacity",
+          "backgroundX",
+          "backgroundY",
+          "backgroundWidth",
+          "backgroundHeight"
         ],
         "type": "object",
         "properties": {
@@ -11194,6 +11218,22 @@
             }
           },
           "backgroundOpacity": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundX": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundY": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundWidth": {
+            "type": "number",
+            "format": "double"
+          },
+          "backgroundHeight": {
             "type": "number",
             "format": "double"
           }

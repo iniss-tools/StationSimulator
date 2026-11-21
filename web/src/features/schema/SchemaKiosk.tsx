@@ -1,4 +1,5 @@
 // Schema stanice na celu obrazovku (#/plan/<cislo>) - cele platno do okna, zivy stav zariadeni, bez ovladania.
+// S parametrom ?symbols=1 su tabule znacky s nazvom a stavom namiesto ziveho obsahu.
 import { useQuery } from "@tanstack/react-query";
 import { errorText, getStationSchemasOptions, useConnection, useSimulatorState } from "@/api";
 import { KioskControls } from "@/app/KioskControls";
@@ -8,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { SchemaCanvas } from "./SchemaCanvas";
 import { backgroundOf } from "./schema";
 
-export function SchemaKiosk({ id }: { id: number }) {
+export function SchemaKiosk({ id, symbols = false }: { id: number; symbols?: boolean }) {
   useLanguage();
   const { connected } = useConnection();
   const state = useSimulatorState();
@@ -25,7 +26,8 @@ export function SchemaKiosk({ id }: { id: number }) {
           <SchemaCanvas
             schema={schema}
             live={{ lines: state.lines, boards: state.boards }}
-            background={backgroundOf(schema, schema.backgroundOpacity)}
+            background={backgroundOf(schema)}
+            symbols={symbols}
             className="rounded-none border-0"
           />
         </div>

@@ -77,9 +77,14 @@ const panelKiosk = createRoute({
 const schemaKiosk = createRoute({
   getParentRoute: () => rootRoute,
   path: "/plan/$id",
+  // ?symbols=1 = tabule ako znacky s nazvom a stavom
+  validateSearch: (search: Record<string, unknown>) => ({
+    symbols: search.symbols === 1 || search.symbols === "1" || search.symbols === true ? true : undefined,
+  }),
   component: function SchemaKioskRoute() {
     const { id } = schemaKiosk.useParams();
-    return <SchemaKiosk id={Number(id)} />;
+    const { symbols } = schemaKiosk.useSearch();
+    return <SchemaKiosk id={Number(id)} symbols={symbols === true} />;
   },
 });
 

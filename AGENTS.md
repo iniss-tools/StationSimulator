@@ -227,9 +227,10 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
 - Schéma stanice `features/schema` – stav prvku z živého stavu simulátora počíta čistý `schema.ts` (`elementState`,
   návrh rozmiestnenia `autoLayout`). Plátno `SchemaCanvas` kreslí kresbu a značky v SVG, živý obsah tabúľ je vrstva
   `BoardView` nad ním s polohou v percentách plátna. Editor `SchemaEditor` (čisté úpravy `schema-edit.ts`, plátno
-  s ťahaním `SchemaEditCanvas`) ukladá až tlačidlom Uložiť.
+  s ťahaním `SchemaEditCanvas`) ukladá až tlačidlom Uložiť, aj obrázok pozadia (`Draft.image`). Otočený prvok sa
+  vyberá a prichytáva podľa `boundsOf`; tlačidlo Značky a `?symbols=1` kiosku kreslia tabule ako značky so stavom.
 - Spoločné časti editorov plátna (čelá, schéma) sú v `src/components/editor`: história, prichytávanie, zarovnanie,
-  poradie, kroky, skratky, schránka, `LayersPanel`, `NumberField`, `DocumentKeys`.
+  poradie, kroky, skratky, schránka, `LayersPanel`, `NumberField`, `DocumentKeys`, `EditorContextMenu`, `ShortcutsDialog`.
 - Kvalita: ESLint (`tools/lint` – vlastný balík s TS 6, typescript-eslint nevie TS 7) a Prettier (šírka 160,
   `endOfLine auto` kvôli CRLF) – po zmene `bun run lint` a `bun run format`, obe bez nálezu. Sľub bez čakania
   označiť `void`; modul s komponentom neexportuje nič iné (Fast Refresh – pomocníci do `.ts` vedľa); čas počas

@@ -77,7 +77,8 @@ public sealed class SchemasApiTests
     {
         await using var server = SimulatorServer.Start();
         var client = server.Client();
-        var created = await client.PostAsJsonAsync("/api/schemas", Schema() with { BackgroundOpacity = 0.3 }, TestContext.CancellationToken);
+        var created = await client.PostAsJsonAsync("/api/schemas", Schema() with { BackgroundOpacity = 0.3, BackgroundX = 40, BackgroundWidth = 600, BackgroundHeight = 300 },
+            TestContext.CancellationToken);
         var schema = (await created.Content.ReadFromJsonAsync<StationSchemaDto>(TestContext.CancellationToken))!;
         Assert.IsNull(schema.Background);
         Assert.AreEqual(HttpStatusCode.NotFound, (await client.GetAsync($"/api/schemas/{schema.Id}/background", TestContext.CancellationToken)).StatusCode);
@@ -90,6 +91,7 @@ public sealed class SchemasApiTests
         var listed = (await client.GetFromJsonAsync<StationSchemaDto[]>("/api/schemas", TestContext.CancellationToken))!.Single();
         Assert.AreEqual(version, listed.Background);
         Assert.AreEqual(0.3, listed.BackgroundOpacity);
+        Assert.AreEqual((40d, 0d, 600d, 300d), (listed.BackgroundX, listed.BackgroundY, listed.BackgroundWidth, listed.BackgroundHeight));
         var served = await client.GetAsync($"/api/schemas/{schema.Id}/background?v={version}", TestContext.CancellationToken);
         Assert.AreEqual("image/png", served.Content.Headers.ContentType?.MediaType);
         CollectionAssert.AreEqual(image, await served.Content.ReadAsByteArrayAsync(TestContext.CancellationToken));

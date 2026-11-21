@@ -1,14 +1,14 @@
 // Export a import schemy stanice cez API: subor so schemou a obrazkom pozadia.
 import { authHeaders, createStationSchema, setSchemaBackground, type StationSchemaDto } from "@/api";
 import { saveFile } from "@/lib/download";
-import { backgroundOf } from "./schema";
+import { backgroundHref, toRequest } from "./schema";
 import { backgroundFileName, fromBase64, parseSchemaFile, schemaFileName, toBase64, toSchemaFile, type SchemaFileBackground } from "./schema-file";
 
 /** Obrazok pozadia schemy zo servera; null = schema ho nema. */
 async function loadBackground(schema: StationSchemaDto): Promise<SchemaFileBackground | null> {
-  const background = backgroundOf(schema, 1);
-  if (!background) return null;
-  const response = await fetch(background.href, { headers: authHeaders() });
+  const href = backgroundHref(schema);
+  if (!href) return null;
+  const response = await fetch(href, { headers: authHeaders() });
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
   const bytes = new Uint8Array(await response.arrayBuffer());
   return { name: backgroundFileName(response.headers.get("content-type") ?? ""), data: toBase64(bytes) };
@@ -16,8 +16,7 @@ async function loadBackground(schema: StationSchemaDto): Promise<SchemaFileBackg
 
 /** Ulozi schemu aj s obrazkom pozadia do suboru. */
 export async function exportSchema(schema: StationSchemaDto): Promise<void> {
-  const request = { name: schema.name, width: schema.width, height: schema.height, elements: schema.elements, backgroundOpacity: schema.backgroundOpacity };
-  const file = toSchemaFile(request, await loadBackground(schema));
+  const file = toSchemaFile(toRequest(schema), await loadBackground(schema));
   saveFile(new Blob([JSON.stringify(file, null, 2)], { type: "application/json" }), schemaFileName(schema.name));
 }
 

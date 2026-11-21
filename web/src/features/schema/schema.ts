@@ -1,24 +1,67 @@
 // Schema stanice: ciste funkcie - zariadenie prvku v stave simulatora, jeho stav na scheme a navrh rozmiestnenia.
-import type { AnnouncementDto, BoardDto, LineDto, SchemaElementDto, SchemaElementKind, StationSchemaDto, StationSchemaRequest } from "@/api";
+import type { AnnouncementDto, BoardDto, LineDto, RemoteQueueDto, SchemaElementDto, SchemaElementKind, StationSchemaDto, StationSchemaRequest } from "@/api";
 import { accessKey } from "@/api/auth";
 
 /** Predvolene krytie obrazka pozadia. */
 export const DEFAULT_OPACITY = 0.5;
 
-/** Obrazok pozadia na platne: adresa (s verziou kvoli vyrovnavacej pamati) a krytie. */
+/** Obrazok pozadia na platne: adresa (s verziou kvoli vyrovnavacej pamati), krytie a plocha, do ktorej sa kresli. */
 export interface SchemaBackground {
   href: string;
   opacity: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
-/** Obrazok pozadia schemy; null = schema ho nema. */
-export function backgroundOf(schema: Pick<StationSchemaDto, "id" | "background">, opacity: number): SchemaBackground | null {
+/** Umiestnenie obrazka pozadia v scheme (cast definicie schemy). */
+export type BackgroundPlacement = Pick<
+  StationSchemaRequest,
+  "width" | "height" | "backgroundOpacity" | "backgroundX" | "backgroundY" | "backgroundWidth" | "backgroundHeight"
+>;
+
+/** Plocha obrazka pozadia: nulovy rozmer = cele platno. */
+export function backgroundBox(p: BackgroundPlacement): { x: number; y: number; width: number; height: number } {
+  return p.backgroundWidth > 0 && p.backgroundHeight > 0
+    ? { x: p.backgroundX, y: p.backgroundY, width: p.backgroundWidth, height: p.backgroundHeight }
+    : { x: 0, y: 0, width: p.width, height: p.height };
+}
+
+/** Adresa obrazka pozadia ulozenej schemy; null = schema ho nema. */
+export function backgroundHref(schema: Pick<StationSchemaDto, "id" | "background">): string | null {
   if (!schema.background) return null;
   // obrazok nacita prehliadac bez hlavicky - zariadenie s klucom ho posle v adrese
   const key = accessKey();
   const query = new URLSearchParams({ v: schema.background, ...(key ? { access_token: key } : {}) });
-  return { href: `/api/schemas/${schema.id}/background?${query.toString()}`, opacity };
+  return `/api/schemas/${schema.id}/background?${query.toString()}`;
 }
+
+/** Obrazok pozadia na adrese href s umiestnenim podla schemy; null = bez obrazka. */
+export function backgroundAt(href: string | null, placement: BackgroundPlacement): SchemaBackground | null {
+  return href ? { href, opacity: placement.backgroundOpacity, ...backgroundBox(placement) } : null;
+}
+
+/** Obrazok pozadia ulozenej schemy; null = schema ho nema. */
+export const backgroundOf = (schema: StationSchemaDto) => backgroundAt(backgroundHref(schema), schema);
+
+/** Definicia schemy (telo ulozenia, subor exportu) - len jej vlastnosti, bez cisla, verzie obrazka a pracovnych udajov editora. */
+export function toRequest(schema: StationSchemaRequest): StationSchemaRequest {
+  return {
+    name: schema.name,
+    width: schema.width,
+    height: schema.height,
+    elements: schema.elements,
+    backgroundOpacity: schema.backgroundOpacity,
+    backgroundX: schema.backgroundX,
+    backgroundY: schema.backgroundY,
+    backgroundWidth: schema.backgroundWidth,
+    backgroundHeight: schema.backgroundHeight,
+  };
+}
+
+/** Predvolene umiestnenie obrazka: cele platno. */
+export const DEFAULT_BACKGROUND = { backgroundOpacity: DEFAULT_OPACITY, backgroundX: 0, backgroundY: 0, backgroundWidth: 0, backgroundHeight: 0 };
 
 /** Druhy prvkov, ktore su zariadenia simulatora. */
 export const DEVICE_KINDS: readonly SchemaElementKind[] = ["board", "audio", "light", "amplifier", "commLine"];
@@ -112,6 +155,12 @@ function audioState(element: SchemaElementDto, board: BoardDto): ElementState {
   const uh = board.manufacturer.toUpperCase() === "AKSIGNALUH";
   const playing = now.find((a) => !uh || a.channel === audio.channel);
   return playing ? { tone: "active", reason: "playing", playing } : idle;
+}
+
+/** Fronty rozhlasu vzdialeneho INISSu, ktore prvok ukazuje a prave hraju (da sa v nich prerusit hlasenie). */
+export function playingQueues(element: SchemaElementDto, board: BoardDto): RemoteQueueDto[] {
+  const queues = board.display.remoteAudio?.queues ?? [];
+  return queues.filter((q) => q.playing && (!element.circuit || q.name === element.circuit));
 }
 
 function lineState(line: LineDto): ElementState {
@@ -265,5 +314,5 @@ export function autoLayout(name: string, live: SchemaLive, width = 1600): Statio
     x += w + GAP;
     rowHeight = Math.max(rowHeight, h);
   }
-  return { name, width, height: Math.min(20000, Math.max(400, y + rowHeight + MARGIN)), elements, backgroundOpacity: DEFAULT_OPACITY };
+  return { name, width, height: Math.min(20000, Math.max(400, y + rowHeight + MARGIN)), elements, ...DEFAULT_BACKGROUND };
 }

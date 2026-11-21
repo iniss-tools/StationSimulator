@@ -1,17 +1,35 @@
 // Platno editora schemy: nad nakreslenou schemou vrstva na vyber (klik, Ctrl/Shift+klik, obdlznik po prazdnom mieste),
 // posun vybranych prvkov a zmenu velkosti uchytmi. Vybrana kolaj alebo ciara ma uchyty v bodoch (tahanie hybe bodom,
-// uchyt v strede useku prida bod, dvojklik bod odstrani). Pri tahani sa prvok prichytava k okrajom a stredom ostatnych prvkov
-// a platna (ruzove vodiace ciary), s Alt bez prichytenia a po desatinach.
-import { useRef, useState, type CSSProperties, type PointerEvent } from "react";
+// uchyt v strede useku prida bod, dvojklik bod odstrani). Pri tahani sa prvok prichytava k okrajom a stredom ostatnych
+// prvkov a platna (ruzove vodiace ciary) alebo k mriezke, s Alt bez prichytenia a po desatinach. Drzany Alt bez
+// tahania meria vzdialenost vyberu od prvku pod mysou (inak od platna). Otoceny prvok sa vybera a prichytava podla
+// obdlznika okolo otocenej plochy; uchyty na zmenu velkosti ma len neotoceny.
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { SchemaElementDto, StationSchemaDto } from "@/api";
 import { intersecting, union } from "@/components/editor/align";
-import { snapEdge, snapMove, targetsOf, type Guide, type SnapOptions, type SnapTargets } from "@/components/editor/snap";
+import { measure } from "@/components/editor/measure";
+import { snapEdge, snapMove, targetsOf, type Gap, type Guide, type SnapOptions, type SnapTargets } from "@/components/editor/snap";
 import { FINE, snap } from "@/components/editor/step";
 import { cn } from "@/lib/utils";
 import type { Box } from "@/render/face";
 import { SchemaCanvas } from "./SchemaCanvas";
 import { isPolyline, type SchemaBackground, type SchemaLive } from "./schema";
-import { boxOf, fitTo, HANDLES, insertPoint, moveBy, movePoint, removePoint, resizeBox, straighten, type Handle } from "./schema-edit";
+import {
+  boundsOf,
+  boxOf,
+  DEVICE_DRAG_TYPE,
+  fitTo,
+  HANDLES,
+  insertPoint,
+  moveBy,
+  movePoint,
+  removePoint,
+  resizeBox,
+  rotationCenter,
+  straighten,
+  type Handle,
+} from "./schema-edit";
+import type { SchemaEditorView } from "./view";
 
 interface Props {
   schema: Pick<StationSchemaDto, "width" | "height" | "elements">;
@@ -23,7 +41,11 @@ interface Props {
   selection: number[];
   /** Prvky skryte v editore. */
   hidden: ReadonlySet<number>;
+  /** Mriezka, prichytavanie a vodiace ciary. */
+  view: SchemaEditorView;
   onSelect: (selection: number[]) => void;
+  /** Zariadenie zo zoznamu pustene na bod platna (kluc zariadenia, suradnice v jednotkach platna). */
+  onDropDevice: (key: string, x: number, y: number) => void;
   /** Zmenene prvky podla indexu; transient = pokracovanie tahania (nie novy krok historie). */
   onChange: (changes: ReadonlyMap<number, SchemaElementDto>, transient: boolean) => void;
 }
@@ -36,6 +58,8 @@ const SNAP_REACH = 6;
 const DOUBLE_CLICK = 400;
 /** Najmensia plocha na chytenie v CSS px. */
 const MIN_HIT = 12;
+/** Hustejsia mriezka nez tolkoto CSS px sa nekresli. */
+const MIN_GRID = 4;
 
 interface Drag {
   pointer: number;
@@ -75,17 +99,53 @@ const handleStyle = (h: Handle, b: Box, scale: number): CSSProperties => ({
           : "ns-resize",
 });
 
-export function SchemaEditCanvas({ schema, live, background, scale, selection, hidden, onSelect, onChange }: Props) {
+/** Dlzka v jednotkach platna na stitok (bez zbytocnych desatin). */
+const number = (value: number) => String(Math.round(value * 10) / 10);
+
+export function SchemaEditCanvas({ schema, live, background, scale, selection, hidden, view, onSelect, onDropDevice, onChange }: Props) {
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const lastPoint = useRef<{ element: number; point: number; time: number } | null>(null);
   const [marquee, setMarquee] = useState<Marquee | null>(null);
-  const [guides, setGuides] = useState<Guide[]>([]);
+  const [lines, setLines] = useState<{ guides: Guide[]; gaps: Gap[] } | null>(null);
+  // mys nad prvkom (index); null = nad prazdnym miestom platna, undefined = mimo platna
+  const [hover, setHover] = useState<number | null | undefined>(undefined);
+  const [alt, setAlt] = useState(false);
+  // prave sa taha (meranie s Alt sa vtedy neukazuje)
+  const [dragging, setDragging] = useState(false);
+
+  // drzany Alt = meranie (kym sa netaha)
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Alt") setAlt(e.type === "keydown");
+    };
+    const blur = () => setAlt(false);
+    window.addEventListener("keydown", key);
+    window.addEventListener("keyup", key);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", key);
+      window.removeEventListener("keyup", key);
+      window.removeEventListener("blur", blur);
+    };
+  }, []);
 
   const elements = schema.elements;
-  const boxes = elements.map((e, i) => (hidden.has(i) ? null : boxOf(e)));
+  const canvas: Box = { x: 0, y: 0, w: schema.width, h: schema.height };
+  // plochy aj s otocenim - vyber obdlznikom, prichytavanie a meranie
+  const bounds = elements.map((e, i) => (hidden.has(i) ? null : boundsOf(e)));
   const shown = { ...schema, elements: elements.filter((_, i) => !hidden.has(i)) };
   const css = (b: Box): CSSProperties => ({ left: b.x * scale, top: b.y * scale, width: b.w * scale, height: b.h * scale });
+  /** Otocenie plochy prvku okolo jeho stredu otocenia. */
+  const rotated = (e: SchemaElementDto, style: CSSProperties): CSSProperties => {
+    if (!e.rotation || isPolyline(e.kind)) return style;
+    const center = rotationCenter(e);
+    return {
+      ...style,
+      rotate: `${e.rotation}deg`,
+      transformOrigin: `${center.x * scale - Number(style.left)}px ${center.y * scale - Number(style.top)}px`,
+    };
+  };
   // tenku kolaj alebo maly prvok treba vediet chytit
   const hit = (b: Box): CSSProperties => {
     const w = Math.max(MIN_HIT, b.w * scale);
@@ -100,6 +160,12 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       // bez zachytenia
     }
   };
+  const snapOptions = (e: { altKey: boolean }): SnapOptions => ({
+    threshold: SNAP_REACH / scale,
+    grid: view.snapGrid && !e.altKey ? { step: view.gridStep, originX: 0, originY: 0 } : null,
+    objects: view.guides && !e.altKey,
+  });
+  const targetsWithout = (moved: ReadonlySet<number>) => targetsOf([...bounds.flatMap((b, i) => (b && !moved.has(i) ? [b] : [])), canvas]);
 
   const begin = (e: PointerEvent<HTMLElement>, index: number, handle: Handle | null) => {
     if (e.button !== 0) return;
@@ -110,8 +176,6 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
     }
     const moving = handle || !selection.includes(index) ? [index] : selection.filter((i) => !elements[i].locked && !hidden.has(i));
     if (!selection.includes(index)) onSelect([index]);
-    const moved = new Set(moving);
-    const others = boxes.flatMap((b, i) => (b && !moved.has(i) ? [b] : []));
     capture(e);
     drag.current = {
       pointer: e.pointerId,
@@ -121,8 +185,9 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       handle,
       point: null,
       originals: new Map(moving.map((i) => [i, elements[i]])),
-      box: union(moving.map((i) => boxOf(elements[i]))),
-      targets: targetsOf([...others, { x: 0, y: 0, w: schema.width, h: schema.height }]),
+      // uchyt meni neotocenu plochu, posun sa prichytava podla plochy s otocenim
+      box: handle ? boxOf(elements[index]) : union(moving.map((i) => boundsOf(elements[i]))),
+      targets: targetsWithout(new Set(moving)),
       changed: false,
     };
   };
@@ -143,7 +208,6 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
     const a = element.points[point];
     const b = element.points[point + 1];
     const original = insert && b ? insertPoint(element, point, (a.x + b.x) / 2, (a.y + b.y) / 2) : element;
-    const others = boxes.flatMap((box, i) => (box && i !== index ? [box] : []));
     capture(e);
     drag.current = {
       pointer: e.pointerId,
@@ -154,12 +218,13 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       point: insert ? point + 1 : point,
       originals: new Map([[index, original]]),
       box: boxOf(original),
-      targets: targetsOf([...others, { x: 0, y: 0, w: schema.width, h: schema.height }]),
+      targets: targetsWithout(new Set([index])),
       changed: false,
     };
   };
 
   const move = (e: PointerEvent<HTMLElement>) => {
+    if (e.altKey !== alt) setAlt(e.altKey);
     if (marquee?.pointer === e.pointerId && root.current) {
       const rect = root.current.getBoundingClientRect();
       setMarquee({ ...marquee, x1: e.clientX - rect.left, y1: e.clientY - rect.top });
@@ -168,24 +233,28 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
     const d = drag.current;
     if (!d || d.pointer !== e.pointerId) return;
     if (!d.started && Math.hypot(e.clientX - d.x, e.clientY - d.y) < DRAG_START) return;
+    if (!d.started) setDragging(true);
     d.started = true;
     let dx = (e.clientX - d.x) / scale;
     let dy = (e.clientY - d.y) / scale;
     const step = e.altKey ? FINE : 1;
-    const options: SnapOptions = { threshold: SNAP_REACH / scale, grid: null, objects: !e.altKey };
-    const lines: Guide[] = [];
+    const options = snapOptions(e);
+    const guides: Guide[] = [];
+    let gaps: Gap[] = [];
     const changes = new Map<number, SchemaElementDto>();
     const h = d.handle;
+    /** Okraj alebo bod na osi: k prvku, inak k mriezke, inak na cely krok. */
+    const edge = (axis: "x" | "y", value: number, delta: number, box: Box) => {
+      const r = snapEdge(axis, value, delta, box, d.targets, options);
+      if (r.guide) guides.push(r.guide);
+      return r.guide || options.grid ? r.delta : snap(value + delta, step) - value;
+    };
     if (d.point !== null) {
       const [[index, original]] = [...d.originals];
       const start = original.points[d.point];
-      const axis = (name: "x" | "y", value: number, delta: number) => {
-        const r = snapEdge(name, value, delta, { x: start.x, y: start.y, w: 0, h: 0 }, d.targets, options);
-        if (r.guide) lines.push(r.guide);
-        return r.guide ? value + r.delta : snap(value + delta, step);
-      };
-      let x = axis("x", start.x, dx);
-      let y = axis("y", start.y, dy);
+      const at = { x: start.x, y: start.y, w: 0, h: 0 };
+      let x = start.x + edge("x", start.x, dx, at);
+      let y = start.y + edge("y", start.y, dy, at);
       // do roviny so susednymi bodmi - useky ostavaju vodorovne a zvisle
       if (!e.altKey) {
         const neighbours = [original.points[d.point - 1], original.points[d.point + 1]].filter((p) => p !== undefined);
@@ -194,22 +263,18 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       changes.set(index, movePoint(original, d.point, x, y));
     } else if (!h) {
       const snapped = snapMove(d.box, dx, dy, d.targets, "left", "top", options);
-      lines.push(...snapped.guides);
-      // os bez prichytenia sa zaokruhli na krok
-      dx = lines.some((g) => g.axis === "x") ? snapped.dx : snap(d.box.x + dx, step) - d.box.x;
-      dy = lines.some((g) => g.axis === "y") ? snapped.dy : snap(d.box.y + dy, step) - d.box.y;
+      guides.push(...snapped.guides);
+      gaps = snapped.gaps;
+      // os bez prichytenia k prvku ide na mriezku, bez nej sa zaokruhli na krok
+      dx = guides.some((g) => g.axis === "x") || options.grid ? snapped.dx : snap(d.box.x + dx, step) - d.box.x;
+      dy = guides.some((g) => g.axis === "y") || options.grid ? snapped.dy : snap(d.box.y + dy, step) - d.box.y;
       for (const [i, original] of d.originals) changes.set(i, moveBy(original, dx, dy, 0.001));
     } else {
-      const edge = (axis: "x" | "y", value: number, delta: number) => {
-        const r = snapEdge(axis, value, delta, d.box, d.targets, options);
-        if (r.guide) lines.push(r.guide);
-        return r.guide ? r.delta : snap(value + delta, step) - value;
-      };
-      if (h.left || h.right) dx = edge("x", h.left ? d.box.x : d.box.x + d.box.w, dx);
-      if (h.top || h.bottom) dy = edge("y", h.top ? d.box.y : d.box.y + d.box.h, dy);
+      if (h.left || h.right) dx = edge("x", h.left ? d.box.x : d.box.x + d.box.w, dx, d.box);
+      if (h.top || h.bottom) dy = edge("y", h.top ? d.box.y : d.box.y + d.box.h, dy, d.box);
       for (const [i, original] of d.originals) changes.set(i, fitTo(original, d.box, resizeBox(d.box, h, dx, dy), 0.001));
     }
-    setGuides(lines);
+    setLines(guides.length || gaps.length ? { guides, gaps } : null);
     if ([...changes].every(([i, changed]) => JSON.stringify(changed) === JSON.stringify(elements[i]))) return;
     onChange(changes, d.changed);
     d.changed = true;
@@ -225,23 +290,34 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
         return;
       }
       const rect = { x: Math.min(m.x0, m.x1) / scale, y: Math.min(m.y0, m.y1) / scale, w: Math.abs(m.x1 - m.x0) / scale, h: Math.abs(m.y1 - m.y0) / scale };
-      const hits = intersecting(boxes, rect).filter((i) => !elements[i].locked);
+      const hits = intersecting(bounds, rect).filter((i) => !elements[i].locked);
       onSelect(m.add ? [...selection, ...hits.filter((i) => !selection.includes(i))] : hits);
       return;
     }
     if (drag.current?.pointer !== e.pointerId) return;
     drag.current = null;
-    setGuides([]);
+    setDragging(false);
+    setLines(null);
   };
 
-  const single = selection.length === 1 && !elements[selection[0]]?.locked ? boxes[selection[0]] : null;
+  const only = selection.length === 1 && !elements[selection[0]]?.locked && bounds[selection[0]] ? elements[selection[0]] : null;
   // jedina vybrana lomena ciara ma uchyty v bodoch namiesto uchytov plochy
-  const line = single && isPolyline(elements[selection[0]].kind) ? elements[selection[0]] : null;
+  const line = only && isPolyline(only.kind) ? only : null;
+  // uchyty plochy len pre neotoceny prvok - otoceny meni rozmer vo vlastnostiach
+  const resizable = only && !line && !only.rotation ? boxOf(only) : null;
   const dot = (x: number, y: number, size: number): CSSProperties => ({ left: x * scale - size / 2, top: y * scale - size / 2, width: size, height: size });
+
+  // meranie s Alt: vyber voci prvku pod mysou, inak voci platnu
+  const selected = selection.flatMap((i) => (bounds[i] ? [bounds[i]] : []));
+  const reach = hover !== undefined && hover !== null && !selection.includes(hover) ? bounds[hover] : hover === undefined ? null : canvas;
+  const measured = alt && !dragging && !marquee && selected.length > 0 && reach ? measure(union(selected), reach) : null;
+  const gaps = lines?.gaps ?? measured ?? [];
+  const grid = view.grid && view.gridStep * scale >= MIN_GRID ? view.gridStep * scale : 0;
 
   return (
     <div
       ref={root}
+      data-schema-canvas
       className="relative shrink-0 touch-none select-none"
       style={{ width: schema.width * scale, height: schema.height * scale }}
       onPointerDown={(e) => {
@@ -255,21 +331,62 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       onPointerMove={move}
       onPointerUp={end}
       onPointerCancel={end}
+      onPointerEnter={() => setHover(null)}
+      onPointerLeave={() => setHover(undefined)}
+      onContextMenu={(e) => {
+        // prave tlacidlo na prvok mimo vyberu vyberie len ten prvok, na prazdne miesto vyber zrusi
+        const id = e.target instanceof HTMLElement ? e.target.dataset.element : undefined;
+        const index = id === undefined ? -1 : elements.findIndex((el) => el.id === Number(id));
+        if (index < 0) onSelect([]);
+        else if (!selection.includes(index)) onSelect([index]);
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(DEVICE_DRAG_TYPE)) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+      }}
+      onDrop={(e) => {
+        const key = e.dataTransfer.getData(DEVICE_DRAG_TYPE);
+        if (!key || !root.current) return;
+        e.preventDefault();
+        const rect = root.current.getBoundingClientRect();
+        onDropDevice(key, (e.clientX - rect.left) / scale, (e.clientY - rect.top) / scale);
+      }}
     >
       <SchemaCanvas schema={shown} live={live} background={background} className="pointer-events-none rounded-none" />
-      {boxes.map((b, i) =>
-        b && !elements[i].locked ? (
-          <div key={elements[i].id} data-element={elements[i].id} className="absolute cursor-move" style={hit(b)} onPointerDown={(e) => begin(e, i, null)} />
-        ) : null,
+      {grid > 0 && (
+        <div
+          aria-hidden
+          data-grid
+          className="pointer-events-none absolute inset-0 text-foreground/15"
+          style={{
+            backgroundImage: "linear-gradient(to right, currentColor 1px, transparent 1px), linear-gradient(to bottom, currentColor 1px, transparent 1px)",
+            backgroundSize: `${grid}px ${grid}px`,
+          }}
+        />
       )}
-      {selection.map((i) => {
-        const b = boxes[i];
-        // jedina vybrana lomena ciara ma uchyty v bodoch - ram plochy by len zavadzal
-        return b && !(line && i === selection[0]) ? (
+      {elements.map((element, i) => {
+        if (hidden.has(i) || element.locked) return null;
+        return (
           <div
-            key={elements[i].id}
-            className={cn("pointer-events-none absolute border-2", elements[i].locked ? "border-dashed border-muted-foreground" : "border-primary")}
-            style={css(b)}
+            key={element.id}
+            data-element={element.id}
+            className="absolute cursor-move"
+            style={rotated(element, hit(boxOf(element)))}
+            onPointerDown={(e) => begin(e, i, null)}
+            onPointerEnter={() => setHover(i)}
+            onPointerLeave={() => setHover(null)}
+          />
+        );
+      })}
+      {selection.map((i) => {
+        const element = elements[i];
+        // jedina vybrana lomena ciara ma uchyty v bodoch - ram plochy by len zavadzal
+        return bounds[i] && !(line && i === selection[0]) ? (
+          <div
+            key={element.id}
+            className={cn("pointer-events-none absolute border-2", element.locked ? "border-dashed border-muted-foreground" : "border-primary")}
+            style={rotated(element, css(boxOf(element)))}
           />
         ) : null;
       })}
@@ -294,18 +411,17 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
           onPointerDown={(e) => beginPoint(e, selection[0], k, false)}
         />
       ))}
-      {single &&
-        !line &&
+      {resizable &&
         HANDLES.map((h, k) => (
           <div
             key={k}
             data-handle={k}
             className="absolute size-2 rounded-xs border border-primary bg-background"
-            style={handleStyle(h, single, scale)}
+            style={handleStyle(h, resizable, scale)}
             onPointerDown={(e) => begin(e, selection[0], h)}
           />
         ))}
-      {guides.map((g, k) => (
+      {lines?.guides.map((g, k) => (
         <div
           key={k}
           className="pointer-events-none absolute bg-pink-500"
@@ -316,6 +432,26 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
           }
         />
       ))}
+      {measured && reach && <div aria-hidden className="pointer-events-none absolute border border-pink-500" style={css(reach)} />}
+      {gaps.map((gap, k) => {
+        const start = gap.from * scale;
+        const length = (gap.to - gap.from) * scale;
+        const at = gap.at * scale;
+        return (
+          <div
+            key={`g${k}`}
+            aria-hidden
+            data-gap
+            className={cn(
+              "pointer-events-none absolute flex items-center justify-center border-pink-500",
+              gap.axis === "y" ? "border-l border-dashed" : "border-t border-dashed",
+            )}
+            style={gap.axis === "y" ? { left: at, top: start, height: length, width: 0 } : { left: start, top: at, width: length, height: 0 }}
+          >
+            <span className="rounded bg-pink-500 px-1 text-[10px] leading-4 font-medium whitespace-nowrap text-white">{number(gap.to - gap.from)}</span>
+          </div>
+        );
+      })}
       {marquee && (
         <div
           className="pointer-events-none absolute border border-primary bg-primary/10"

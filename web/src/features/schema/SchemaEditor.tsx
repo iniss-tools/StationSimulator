@@ -1,13 +1,16 @@
-// Editor schemy stanice: hore nastroje (spat, znova, pridat, mierka, zahodit, ulozit), vlavo zariadenia, ktore este na
-// scheme nie su, a vrstvy, v strede platno, vpravo vlastnosti. Zmeny sa ulozia az tlacidlom Ulozit (Ctrl+S).
-import { useLayoutEffect, useRef, useState } from "react";
+// Editor schemy stanice: hore nastroje (spat, znova, pridat, mierka, skratky, zahodit, ulozit), vlavo zariadenia, ktore
+// este na scheme nie su, vrstvy a volby zobrazenia, v strede platno s kontextovou ponukou, vpravo vlastnosti. Zmeny
+// vratane obrazka pozadia sa ulozia az tlacidlom Ulozit (Ctrl+S).
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowLeft, CircleAlert, Plus, Redo, Save, Undo, Undo2, ZoomIn, ZoomOut } from "lucide-react";
+import { ArrowLeft, CircleAlert, Keyboard, Plus, Redo, Save, Undo, Undo2, ZoomIn, ZoomOut } from "lucide-react";
 import { toast } from "sonner";
 import {
+  deleteSchemaBackground,
   errorText,
   getStationSchemasQueryKey,
   queryClient,
+  setSchemaBackground,
   setStationSchema,
   type SchemaElementDto,
   type SchemaElementKind,
@@ -15,12 +18,17 @@ import {
   type StationSchemaRequest,
 } from "@/api";
 import { confirmAction } from "@/components/common/confirm";
+import { CheckField } from "@/components/common/form-field";
+import { OptionSelect } from "@/components/common/option-select";
 import { alignDeltas, type AlignOp } from "@/components/editor/align";
 import { DocumentKeys } from "@/components/editor/DocumentKeys";
+import { EditorContextMenu } from "@/components/editor/EditorContextMenu";
 import { useHistory } from "@/components/editor/history";
 import { LayersPanel } from "@/components/editor/LayersPanel";
 import { extremeOrder, stepOrder } from "@/components/editor/order";
 import { shortcutAction, type EditorAction } from "@/components/editor/shortcuts";
+import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
+import { FINE } from "@/components/editor/step";
 import { typing, zoomStep } from "@/components/editor/zoom";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -30,26 +38,36 @@ import { Spinner } from "@/components/ui/spinner";
 import { t } from "@/i18n";
 import { SchemaEditCanvas } from "./SchemaEditCanvas";
 import { SchemaProperties, type ElementPatch } from "./SchemaProperties";
-import { backgroundOf, elementLabel, type DeviceCandidate, type SchemaLive } from "./schema";
+import { backgroundAt, backgroundHref, deviceKey, elementLabel, toRequest, type DeviceCandidate, type SchemaLive } from "./schema";
 import { copyElements, useClipboard } from "./schema-clipboard";
-import { boxOf, cloneElements, DRAWING_KINDS, moveBy, newDevice, newDrawing, nextId, unplacedDevices } from "./schema-edit";
+import {
+  boundsOf,
+  boxOf,
+  cloneElements,
+  DEVICE_DRAG_TYPE,
+  DRAWING_KINDS,
+  dropPosition,
+  moveBy,
+  newDevice,
+  newDrawing,
+  nextId,
+  unplacedDevices,
+} from "./schema-edit";
+import { imageProblem, type ImageChange } from "./schema-image";
 import { KIND_ICONS } from "./schema-icons";
+import { SCHEMA_SHORTCUTS } from "./shortcut-groups";
+import { GRID_STEPS, loadEditorView, saveEditorView, type SchemaEditorView } from "./view";
 
 /** Posun vlozenych a duplikovanych prvkov, aby neprekryli povodne. */
 const PASTE_OFFSET = 20;
 
-const toRequest = (s: StationSchemaDto): StationSchemaRequest => ({
-  name: s.name,
-  width: s.width,
-  height: s.height,
-  elements: s.elements,
-  backgroundOpacity: s.backgroundOpacity,
-});
+/** Rozpracovana schema: definicia a zmena obrazka pozadia, ktora caka na ulozenie (aby ju vratil krok spat). */
+type Draft = StationSchemaRequest & { image: ImageChange };
 
 export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaDto; live: SchemaLive; onClose: () => void }) {
   // ulozena podoba - po ulozeni sa nahradi tym, co sa ulozilo
   const [saved, setSaved] = useState(() => toRequest(schema));
-  const history = useHistory<StationSchemaRequest>(saved);
+  const history = useHistory<Draft>({ ...saved, image: null });
   const form = history.value;
   const [selection, setSelection] = useState<number[]>([]);
   const [hidden, setHidden] = useState<ReadonlySet<number>>(new Set());
@@ -57,8 +75,19 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
   const [fit, setFit] = useState(1);
   const viewport = useRef<HTMLDivElement>(null);
   const clipboard = useClipboard();
+  const [view, setViewState] = useState(loadEditorView);
+  const [help, setHelp] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  // adresy obrazkov vybranych zo suboru - uvolnia sa pri odchode z editora (kroky spat sa na ne mozu vratit)
+  const urls = useRef<string[]>([]);
+  useEffect(() => () => urls.current.forEach((url) => URL.revokeObjectURL(url)), []);
+  const setView = (patch: Partial<SchemaEditorView>) => {
+    const next = { ...view, ...patch };
+    setViewState(next);
+    saveEditorView(next);
+  };
 
-  const dirty = JSON.stringify(form) !== JSON.stringify(saved);
+  const dirty = form.image !== null || JSON.stringify(toRequest(form)) !== JSON.stringify(saved);
   const chosen = selection.filter((i) => i < form.elements.length);
   const scale = zoom ?? fit;
 
@@ -74,15 +103,23 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
   }, [form.width]);
 
   const save = useMutation({
-    mutationFn: async (body: StationSchemaRequest) => {
+    mutationFn: async (draft: Draft) => {
+      const body = toRequest(draft);
       await setStationSchema({ path: { id: schema.id }, body, throwOnError: true });
+      // obrazok az po scheme - pri chybe schemy ostane povodny
+      if (draft.image === "remove") {
+        if (schema.background) await deleteSchemaBackground({ path: { id: schema.id }, throwOnError: true });
+      } else if (draft.image) {
+        await setSchemaBackground({ path: { id: schema.id }, query: { name: draft.image.file.name }, body: draft.image.file, throwOnError: true });
+      }
       return body;
     },
     onSuccess: async (body) => {
       const stored = { ...body, name: body.name.trim() };
-      setSaved(stored);
-      history.reset(stored);
+      // najprv nova verzia obrazka zo servera, az potom sa zahodi docasny
       await queryClient.invalidateQueries({ queryKey: getStationSchemasQueryKey() });
+      setSaved(stored);
+      history.reset({ ...stored, image: null });
       toast.success(t("schema.saved"));
     },
   });
@@ -94,7 +131,20 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
     onClose();
   };
 
-  const change = (patch: Partial<StationSchemaRequest>, transient = false) => history.set({ ...form, ...patch }, transient);
+  const change = (patch: Partial<Draft>, transient = false) => history.set({ ...form, ...patch }, transient);
+  /** Novy obrazok pozadia zo suboru - nahra sa az pri ulozeni schemy. */
+  const pickImage = (file: File) => {
+    const problem = imageProblem(file);
+    setImageError(problem ? t(problem) : null);
+    if (problem) return;
+    const url = URL.createObjectURL(file);
+    urls.current.push(url);
+    change({ image: { file, url } });
+  };
+  const removeImage = () => {
+    setImageError(null);
+    change({ image: schema.background ? "remove" : null });
+  };
   const setElements = (elements: SchemaElementDto[], transient = false) => change({ elements }, transient);
   const updateMany = (changes: ReadonlyMap<number, SchemaElementDto>, transient = false) =>
     setElements(
@@ -119,6 +169,11 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
     insert([newDrawing(kind, nextId(form.elements), ...spot(sample.w, sample.h), text)]);
   };
   const addDevice = (device: DeviceCandidate) => insert([newDevice(device, nextId(form.elements), ...spot(device.width, device.height))]);
+  /** Zariadenie pretiahnute zo zoznamu a pustene na platno. */
+  const dropDevice = (key: string, x: number, y: number) => {
+    const device = unplacedDevices(live, form.elements).find((d) => deviceKey(d) === key);
+    if (device) insert([newDevice(device, nextId(form.elements), ...dropPosition(device, x, y, form.width, form.height))]);
+  };
   const removeMany = (indices: number[]) => {
     const gone = new Set(indices);
     const shift = (i: number) => i - indices.filter((r) => r < i).length;
@@ -143,7 +198,7 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
   };
   /** Zarovnanie vybranych prvkov; jeden prvok sa zarovna k platnu. */
   const align = (op: AlignOp) => {
-    const boxes = chosen.map((i) => boxOf(form.elements[i]));
+    const boxes = chosen.map((i) => boundsOf(form.elements[i]));
     const deltas = alignDeltas(boxes, op, chosen.length === 1 ? { x: 0, y: 0, w: form.width, h: form.height } : undefined);
     updateMany(new Map(chosen.map((i, k) => [i, moveBy(form.elements[i], deltas[k].dx, deltas[k].dy, 0.01)])));
   };
@@ -220,11 +275,16 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
       return;
     }
     if (typing(e.target) || (e.target instanceof Element && e.target.closest('[role="dialog"],[role="alertdialog"],[role="listbox"],[role="menu"]'))) return;
+    if (e.key === "?" && !mod) {
+      e.preventDefault();
+      setHelp(true);
+      return;
+    }
     const arrows: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
     const arrow = arrows[e.key];
     if (arrow && !mod && chosen.length) {
       e.preventDefault();
-      const step = e.shiftKey ? 10 : 1;
+      const step = e.altKey ? FINE : e.shiftKey ? 10 : 1;
       patchSelected((el) => (el.locked ? el : moveBy(el, arrow[0] * step, arrow[1] * step, 0.001)), e.repeat);
       return;
     }
@@ -237,8 +297,12 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
   };
 
   const unplaced = unplacedDevices(live, form.elements);
-  // obrazok je ulozeny hned po nahrati (mimo krokov spat), krytie sa uklada so schemou
-  const background = backgroundOf(schema, form.backgroundOpacity);
+  // obrazok vybrany v editore sa ukazuje hned, na server ide az pri ulozeni
+  const href = form.image === null ? backgroundHref(schema) : form.image === "remove" ? null : form.image.url;
+  const background = backgroundAt(href, form);
+  const inSelection = new Set(chosen);
+  const canForward = chosen.some((i) => i < form.elements.length - 1 && !inSelection.has(i + 1));
+  const canBackward = chosen.some((i) => i > 0 && !inSelection.has(i - 1));
   const label = (e: SchemaElementDto) => elementLabel(e, live) || t(`schema.kind.${e.kind}`);
 
   return (
@@ -289,13 +353,17 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
         <Button variant="ghost" size="icon" title={t("faces.zoom.in")} aria-label={t("faces.zoom.in")} onClick={() => setZoom(zoomStep(scale, 1))}>
           <ZoomIn />
         </Button>
+        <Button variant="ghost" size="icon" title={t("faces.shortcuts")} aria-label={t("faces.keys.title")} onClick={() => setHelp(true)}>
+          <Keyboard />
+        </Button>
         <div className="ml-auto flex flex-wrap items-center gap-2">
           {dirty && <span className="text-sm text-muted-foreground">{t("settings.unsaved")}</span>}
           <Button
             variant="outline"
             disabled={!dirty || save.isPending}
             onClick={() => {
-              history.reset(saved);
+              history.reset({ ...saved, image: null });
+              setImageError(null);
               setSelection([]);
               setHidden(new Set());
               save.reset();
@@ -330,7 +398,14 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
                   const Icon = KIND_ICONS[device.kind];
                   const name = label(newDevice(device, 0, 0, 0));
                   return (
-                    <li key={`${device.kind}|${device.line}|${device.address ?? ""}|${device.circuit}`}>
+                    <li
+                      key={deviceKey(device)}
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.effectAllowed = "copy";
+                        e.dataTransfer.setData(DEVICE_DRAG_TYPE, deviceKey(device));
+                      }}
+                    >
                       <button
                         type="button"
                         title={t("schema.devices.add", { name })}
@@ -361,30 +436,62 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
               onReorder={reorder}
             />
           </section>
+          <section className="flex shrink-0 flex-col gap-2 border-t pt-3">
+            <h2 className="text-xs font-medium text-muted-foreground">{t("faces.view")}</h2>
+            <div className="flex items-center gap-2">
+              <CheckField label={t("faces.grid")} checked={view.grid} onCheckedChange={(grid) => setView({ grid })} className="w-auto" />
+              <OptionSelect
+                value={view.gridStep}
+                onValueChange={(gridStep) => setView({ gridStep })}
+                ariaLabel={t("faces.grid.step")}
+                size="sm"
+                className="ml-auto w-auto"
+                options={GRID_STEPS.map((step) => ({ value: step, label: String(step) }))}
+              />
+            </div>
+            <CheckField label={t("faces.snapGrid")} checked={view.snapGrid} onCheckedChange={(snapGrid) => setView({ snapGrid })} />
+            <CheckField label={t("faces.guides")} checked={view.guides} onCheckedChange={(guides) => setView({ guides })} />
+          </section>
         </aside>
 
-        <div
-          ref={viewport}
-          className="order-1 min-h-64 overflow-auto rounded-xl border bg-muted/40 p-4 xl:order-none"
-          onPointerDown={(e) => e.target === e.currentTarget && setSelection([])}
+        <EditorContextMenu
+          className="order-1 flex min-h-64 xl:order-none"
+          count={chosen.length}
+          readOnly={false}
+          canPaste={clipboard.length > 0}
+          canForward={canForward}
+          canBackward={canBackward}
+          locked={chosen.length > 0 && chosen.every((i) => form.elements[i].locked)}
+          hidden={chosen.length > 0 && chosen.every((i) => hidden.has(i))}
+          onAction={(action) => void run(action)}
         >
-          <SchemaEditCanvas
-            schema={form}
-            live={live}
-            background={background}
-            scale={scale}
-            selection={chosen}
-            hidden={hidden}
-            onSelect={setSelection}
-            onChange={(changes, transient) => updateMany(changes, transient)}
-          />
-        </div>
+          <div
+            ref={viewport}
+            className="min-h-0 min-w-0 flex-1 overflow-auto rounded-xl border bg-muted/40 p-4"
+            onPointerDown={(e) => e.button === 0 && e.target === e.currentTarget && setSelection([])}
+          >
+            <SchemaEditCanvas
+              schema={form}
+              live={live}
+              background={background}
+              scale={scale}
+              selection={chosen}
+              hidden={hidden}
+              view={view}
+              onSelect={setSelection}
+              onDropDevice={dropDevice}
+              onChange={(changes, transient) => updateMany(changes, transient)}
+            />
+          </div>
+        </EditorContextMenu>
 
         <aside className="order-3 min-h-0 overflow-y-auto rounded-xl border bg-card p-3 xl:order-none">
           <SchemaProperties
             schema={form}
-            schemaId={schema.id}
             background={background}
+            imageError={imageError}
+            onImage={pickImage}
+            onRemoveImage={removeImage}
             elements={chosen.map((i) => form.elements[i])}
             live={live}
             onPatch={patchSelected}
@@ -394,6 +501,8 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
           />
         </aside>
       </div>
+
+      <ShortcutsDialog open={help} onClose={() => setHelp(false)} title={t("faces.keys.title")} hint={t("schema.keys.hint")} groups={SCHEMA_SHORTCUTS} />
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { CheckField, FormField } from "@/components/common/form-field";
 import { FormDialog } from "@/components/common/form-dialog";
 import { Input } from "@/components/ui/input";
 import { t } from "@/i18n";
-import { autoLayout, DEFAULT_OPACITY, type SchemaLive } from "./schema";
+import { autoLayout, DEFAULT_BACKGROUND, type SchemaLive } from "./schema";
 
 /** Rozmer prazdneho platna. */
 const EMPTY_SIZE = { width: 1600, height: 900 };
@@ -16,7 +16,7 @@ export function NewSchemaDialog({ live, onClose, onCreated }: { live: SchemaLive
   const [devices, setDevices] = useState(live.boards.length > 0);
   const create = useMutation({
     mutationFn: async () => {
-      const body = devices ? autoLayout(name, live) : { name, ...EMPTY_SIZE, elements: [], backgroundOpacity: DEFAULT_OPACITY };
+      const body = devices ? autoLayout(name, live) : { name, ...EMPTY_SIZE, elements: [], ...DEFAULT_BACKGROUND };
       return (await createStationSchema({ body, throwOnError: true })).data;
     },
     onSuccess: async (schema) => {

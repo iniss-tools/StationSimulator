@@ -13,6 +13,10 @@ public sealed partial class StationSchemaRequestValidator : AbstractValidator<St
         RuleFor(r => r.Width).InclusiveBetween(SchemaErrors.MinCanvas, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.Size);
         RuleFor(r => r.Height).InclusiveBetween(SchemaErrors.MinCanvas, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.Size);
         RuleFor(r => r.BackgroundOpacity).InclusiveBetween(0, 1).WithErrorCode(SchemaErrors.Opacity);
+        RuleFor(r => r.BackgroundX).InclusiveBetween(-SchemaErrors.MaxCanvas, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.BackgroundBox);
+        RuleFor(r => r.BackgroundY).InclusiveBetween(-SchemaErrors.MaxCanvas, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.BackgroundBox);
+        RuleFor(r => r.BackgroundWidth).InclusiveBetween(0, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.BackgroundBox);
+        RuleFor(r => r.BackgroundHeight).InclusiveBetween(0, SchemaErrors.MaxCanvas).WithErrorCode(SchemaErrors.BackgroundBox);
         RuleFor(r => r.Elements).NotNull().Must(e => e.Count <= SchemaErrors.MaxElements).WithErrorCode(SchemaErrors.Elements);
         RuleFor(r => r.Elements).Must(e => e.Where(x => x is not null).Select(x => x.Id).Distinct().Count() == e.Count).When(r => r.Elements is not null)
             .WithErrorCode(SchemaErrors.ElementId).WithMessage("Element ids must be unique.");

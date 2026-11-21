@@ -1,7 +1,6 @@
 // Panel vlastnosti editora schemy: vybrane prvky (zarovnanie, poloha, text, farby, zariadenie), bez vyberu nazov a
 // rozmer platna. Pri viacerych prvkoch s roznou hodnotou pole ukaze "Rozne" a zmena plati pre vsetky.
 import { Fragment, useRef } from "react";
-import { useMutation } from "@tanstack/react-query";
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -11,6 +10,7 @@ import {
   AlignStartHorizontal,
   AlignStartVertical,
   AlignVerticalSpaceAround,
+  Expand,
   ImageUp,
   Layers,
   Lock,
@@ -19,24 +19,16 @@ import {
   Trash2,
   type LucideIcon,
 } from "lucide-react";
-import {
-  deleteSchemaBackground,
-  errorText,
-  getStationSchemasQueryKey,
-  queryClient,
-  setSchemaBackground,
-  type SchemaElementDto,
-  type StationSchemaRequest,
-} from "@/api";
+import type { SchemaElementDto, StationSchemaRequest } from "@/api";
 import { FormField } from "@/components/common/form-field";
 import { OptionSelect } from "@/components/common/option-select";
 import { ALIGN_OPS, canAlign, type AlignOp } from "@/components/editor/align";
 import { NumberField, PanelSection } from "@/components/editor/fields";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Spinner } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
 import { t } from "@/i18n";
-import { deviceCandidates, deviceKey, elementLabel, isDevice, isPolyline, type SchemaBackground, type SchemaLive } from "./schema";
+import { backgroundBox, deviceCandidates, deviceKey, elementLabel, isDevice, isPolyline, type SchemaBackground, type SchemaLive } from "./schema";
 import { boxOf, common, MIN_SIZE, moveBy } from "./schema-edit";
 import { imageSize } from "./image-size";
 import { KIND_ICONS } from "./schema-icons";
@@ -57,9 +49,13 @@ export type ElementPatch = Partial<SchemaElementDto> | ((element: SchemaElementD
 
 interface Props {
   schema: StationSchemaRequest;
-  /** Cislo upravovanej schemy (nahratie obrazka pozadia). */
-  schemaId: number;
+  /** Obrazok pozadia, ako ho editor prave ukazuje (aj vybrany a este neulozeny). */
   background: SchemaBackground | null;
+  /** Preco sa vybrany obrazok neda pouzit; null = v poriadku. */
+  imageError: string | null;
+  /** Novy obrazok pozadia zo suboru (ulozi sa so schemou). */
+  onImage: (file: File) => void;
+  onRemoveImage: () => void;
   /** Vybrane prvky. */
   elements: SchemaElementDto[];
   live: SchemaLive;
@@ -71,6 +67,11 @@ interface Props {
 
 const DEFAULT = "default";
 const CUSTOM = "custom";
+
+type FieldsProps = Pick<Props, "schema" | "background" | "imageError" | "onSchema" | "onImage" | "onRemoveImage">;
+
+/** Obrazok pozadia na cele platno (bez vlastnej polohy a rozmeru). */
+const WHOLE_CANVAS = { backgroundX: 0, backgroundY: 0, backgroundWidth: 0, backgroundHeight: 0 };
 
 /** Farba: predvolena podla druhu a temy, alebo vlastna #rrggbb. */
 function ColorField({ label, value, onChange }: { label: string; value: string | undefined; onChange: (value: string) => void }) {
@@ -101,21 +102,21 @@ function ColorField({ label, value, onChange }: { label: string; value: string |
   );
 }
 
-function SchemaFields({ schema, schemaId, background, onSchema }: Pick<Props, "schema" | "schemaId" | "background" | "onSchema">) {
+function SchemaFields({ schema, background, imageError, onSchema, onImage, onRemoveImage }: FieldsProps) {
   const input = useRef<HTMLInputElement>(null);
-  const refresh = () => queryClient.invalidateQueries({ queryKey: getStationSchemasQueryKey() });
-  const upload = useMutation({
-    mutationFn: (file: File) => setSchemaBackground({ path: { id: schemaId }, query: { name: file.name }, body: file, throwOnError: true }),
-    onSuccess: refresh,
-  });
-  const remove = useMutation({ mutationFn: () => deleteSchemaBackground({ path: { id: schemaId }, throwOnError: true }), onSuccess: refresh });
-  /** Vyska platna podla pomeru stran obrazka (sirka ostava). */
+  const box = backgroundBox(schema);
+  /** Vyska platna podla pomeru stran obrazka (sirka ostava), obrazok na cele platno. */
   const fitCanvas = async () => {
     if (!background) return;
     const size = await imageSize(background.href);
-    if (size) onSchema({ height: Math.max(100, Math.round((schema.width * size.height) / size.width)) });
+    if (size) onSchema({ height: Math.max(100, Math.round((schema.width * size.height) / size.width)), ...WHOLE_CANVAS });
   };
-  const error = upload.error ?? remove.error;
+  /** Zmena plochy obrazka - od tej chvile ma vlastnu polohu a rozmer. */
+  const place = (key: "x" | "y" | "width" | "height", value: number, transient?: boolean) => {
+    const next = { ...box, [key]: key === "width" || key === "height" ? Math.max(1, value) : value };
+    onSchema({ backgroundX: next.x, backgroundY: next.y, backgroundWidth: next.width, backgroundHeight: next.height }, transient);
+  };
+  const placed = schema.backgroundWidth > 0 && schema.backgroundHeight > 0;
   return (
     <div className="flex flex-col gap-3">
       <PanelSection title={t("schema.section.schema")}>
@@ -148,17 +149,17 @@ function SchemaFields({ schema, schemaId, background, onSchema }: Pick<Props, "s
           aria-label={t("schema.background.upload")}
           onChange={(e) => {
             const file = e.target.files?.[0];
-            if (file) upload.mutate(file);
+            if (file) onImage(file);
             e.target.value = "";
           }}
         />
         <div className="col-span-2 flex flex-wrap gap-2">
-          <Button type="button" variant="outline" size="sm" disabled={upload.isPending} onClick={() => input.current?.click()}>
-            {upload.isPending ? <Spinner /> : <ImageUp />}
+          <Button type="button" variant="outline" size="sm" onClick={() => input.current?.click()}>
+            <ImageUp />
             {t(background ? "schema.background.replace" : "schema.background.upload")}
           </Button>
           {background && (
-            <Button type="button" variant="outline" size="sm" disabled={remove.isPending} onClick={() => remove.mutate()}>
+            <Button type="button" variant="outline" size="sm" onClick={onRemoveImage}>
               <Trash2 />
               {t("common.delete")}
             </Button>
@@ -166,6 +167,10 @@ function SchemaFields({ schema, schemaId, background, onSchema }: Pick<Props, "s
         </div>
         {background && (
           <>
+            <NumberField label="X" value={Math.round(box.x * 100) / 100} step={1} disabled={false} onChange={(v, tr) => place("x", v, tr)} />
+            <NumberField label="Y" value={Math.round(box.y * 100) / 100} step={1} disabled={false} onChange={(v, tr) => place("y", v, tr)} />
+            <NumberField label={t("schema.field.width")} value={box.width} step={10} min={1} disabled={false} onChange={(v, tr) => place("width", v, tr)} />
+            <NumberField label={t("schema.field.height")} value={box.height} step={10} min={1} disabled={false} onChange={(v, tr) => place("height", v, tr)} />
             <NumberField
               label={t("schema.background.opacity")}
               value={Math.round(schema.backgroundOpacity * 100)}
@@ -174,21 +179,28 @@ function SchemaFields({ schema, schemaId, background, onSchema }: Pick<Props, "s
               disabled={false}
               onChange={(v, tr) => onSchema({ backgroundOpacity: Math.min(100, Math.max(0, v)) / 100 }, tr)}
             />
-            <Button type="button" variant="ghost" size="sm" className="col-span-2 justify-start" onClick={() => void fitCanvas()}>
-              <Scaling />
-              {t("schema.background.fit")}
-            </Button>
+            <div className="col-span-2 flex flex-wrap gap-1">
+              <Button type="button" variant="ghost" size="sm" disabled={!placed} onClick={() => onSchema(WHOLE_CANVAS)}>
+                <Expand />
+                {t("schema.background.whole")}
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void fitCanvas()}>
+                <Scaling />
+                {t("schema.background.fit")}
+              </Button>
+            </div>
           </>
         )}
-        <p className="col-span-2 text-xs text-muted-foreground">{error ? errorText(error) : t("schema.background.hint")}</p>
+        <p className={cn("col-span-2 text-xs", imageError ? "text-destructive" : "text-muted-foreground")}>{imageError ?? t("schema.background.hint")}</p>
       </PanelSection>
       <p className="text-xs text-muted-foreground">{t("schema.properties.hint")}</p>
     </div>
   );
 }
 
-export function SchemaProperties({ schema, schemaId, background, elements, live, onPatch, onSchema, onAlign, onRemove }: Props) {
-  if (elements.length === 0) return <SchemaFields schema={schema} schemaId={schemaId} background={background} onSchema={onSchema} />;
+export function SchemaProperties({ schema, background, imageError, elements, live, onPatch, onSchema, onImage, onRemoveImage, onAlign, onRemove }: Props) {
+  if (elements.length === 0)
+    return <SchemaFields schema={schema} background={background} imageError={imageError} onSchema={onSchema} onImage={onImage} onRemoveImage={onRemoveImage} />;
 
   const single = elements.length === 1 ? elements[0] : null;
   const kind = common(elements.map((e) => e.kind));

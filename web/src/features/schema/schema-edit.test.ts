@@ -2,9 +2,11 @@ import { describe, expect, test } from "bun:test";
 import type { BoardDto, LineDto } from "@/api";
 import { blankElement } from "./schema";
 import {
+  boundsOf,
   boxOf,
   cloneElements,
   common,
+  dropPosition,
   fitTo,
   insertPoint,
   moveBy,
@@ -127,5 +129,39 @@ describe("body lomenej ciary", () => {
     expect(straighten(150, 43, neighbours, 5)).toEqual({ x: 150, y: 40 });
     expect(straighten(297, 100, neighbours, 5)).toEqual({ x: 300, y: 100 });
     expect(straighten(150, 100, neighbours, 5)).toEqual({ x: 150, y: 100 });
+  });
+});
+
+describe("pustenie zariadenia na platno", () => {
+  const device = { width: 100, height: 40 };
+
+  test("stred zariadenia je pod kurzorom", () => {
+    expect(dropPosition(device, 500.4, 300, 1600, 900)).toEqual([450, 280]);
+  });
+
+  test("zariadenie ostane cele na platne", () => {
+    expect(dropPosition(device, 10, 5, 1600, 900)).toEqual([0, 0]);
+    expect(dropPosition(device, 1590, 895, 1600, 900)).toEqual([1500, 860]);
+    expect(dropPosition({ width: 2000, height: 40 }, 800, 100, 1600, 900)).toEqual([0, 80]);
+  });
+});
+
+describe("otoceny prvok", () => {
+  test("bez otocenia je plocha rovnaka, lomena ciara sa neotaca", () => {
+    expect(boundsOf(area)).toEqual(boxOf(area));
+    expect(boundsOf({ ...track, rotation: 45 })).toEqual(boxOf(track));
+  });
+
+  test("otocenie o 90 stupnov vymeni sirku a vysku okolo stredu", () => {
+    // plocha 100 x 50 so stredom (60, 45)
+    expect(boundsOf({ ...area, rotation: 90 })).toEqual({ x: 35, y: -5, w: 50, h: 100 });
+  });
+
+  test("sikme otocenie zvacsi plochu na obe strany rovnako", () => {
+    const bounds = boundsOf({ ...area, rotation: 45 });
+    expect(bounds.w).toBeCloseTo(106.066, 2);
+    expect(bounds.h).toBeCloseTo(106.066, 2);
+    expect(bounds.x + bounds.w / 2).toBeCloseTo(60, 2);
+    expect(bounds.y + bounds.h / 2).toBeCloseTo(45, 2);
   });
 });

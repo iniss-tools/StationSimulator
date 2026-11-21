@@ -1,7 +1,7 @@
 // Schema stanice: vyber schemy, platno so zivym stavom zariadeni, hrajuce hlasenia a detail zariadenia po kliknuti.
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { Download, Ellipsis, Map as MapIcon, Maximize, Pencil, Plus, Trash2, Upload, Volume2 } from "lucide-react";
+import { Download, Ellipsis, Map as MapIcon, Maximize, Pencil, Plus, Shapes, Trash2, Upload, Volume2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   deleteStationSchema,
@@ -27,16 +27,18 @@ import { SchemaDetail } from "./SchemaDetail";
 import { SchemaEditor } from "./SchemaEditor";
 import { announcementText, backgroundOf, elementLabel, elementState } from "./schema";
 import { exportSchema, importSchema } from "./schema-transfer";
-import { loadSchemaChoice, saveSchemaChoice } from "./view";
+import { loadSchemaChoice, loadSymbols, saveSchemaChoice, saveSymbols } from "./view";
 
 export function SchemaPage() {
   const state = useSimulatorState();
   const can = useCan();
   const edit = can(PERMISSIONS.schemas);
+  const control = can(PERMISSIONS.boards);
   const schemas = useQuery(getStationSchemasOptions()).data;
   const [choice, setChoice] = useState(loadSchemaChoice);
   const [selected, setSelected] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [symbols, setSymbols] = useState(loadSymbols);
   const [editing, setEditing] = useState(false);
 
   const schema = schemas?.find((s) => s.id === choice) ?? schemas?.[0];
@@ -83,6 +85,20 @@ export function SchemaPage() {
             className="min-w-48"
           />
         )}
+        {schema && (
+          <Button
+            variant={symbols ? "secondary" : "outline"}
+            aria-pressed={symbols}
+            title={t("schema.symbols.hint")}
+            onClick={() => {
+              setSymbols(!symbols);
+              saveSymbols(!symbols);
+            }}
+          >
+            <Shapes />
+            {t("schema.symbols")}
+          </Button>
+        )}
         {edit && schema && (
           <Button variant="outline" onClick={() => setEditing(true)}>
             <Pencil />
@@ -102,7 +118,7 @@ export function SchemaPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="min-w-52">
               {schema && (
-                <DropdownMenuItem onClick={() => window.open(`#/plan/${schema.id}`, "_blank")}>
+                <DropdownMenuItem onClick={() => window.open(`#/plan/${schema.id}${symbols ? "?symbols=1" : ""}`, "_blank")}>
                   <Maximize />
                   {t("schema.kiosk.open")}
                 </DropdownMenuItem>
@@ -167,7 +183,8 @@ export function SchemaPage() {
           <SchemaCanvas
             schema={schema}
             live={live}
-            background={backgroundOf(schema, schema.backgroundOpacity)}
+            background={backgroundOf(schema)}
+            symbols={symbols}
             selected={selected}
             onSelect={(e) => setSelected(e.id)}
           />
@@ -183,7 +200,7 @@ export function SchemaPage() {
         </>
       )}
 
-      {element && <SchemaDetail element={element} live={live} onClose={() => setSelected(null)} />}
+      {element && <SchemaDetail element={element} live={live} control={control} onClose={() => setSelected(null)} />}
       {creating && (
         <NewSchemaDialog
           live={live}

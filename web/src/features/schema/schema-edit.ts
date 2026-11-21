@@ -123,6 +123,24 @@ export function newDevice(device: DeviceCandidate, id: number, x: number, y: num
   return { ...blankElement(id, device.kind, x, y, device.width, device.height), line: device.line, address: device.address, circuit: device.circuit };
 }
 
+/** Typ udajov pri tahani zariadenia zo zoznamu na platno (hodnota = kluc zariadenia). */
+export const DEVICE_DRAG_TYPE = "application/x-stationsimulator-device";
+
+/**
+ * Lavy horny roh zariadenia pusteneho na bod (x, y) platna: stred zariadenia pod kurzorom, cele zariadenie ostane na
+ * platne a poloha je v celych jednotkach.
+ */
+export function dropPosition(
+  device: Pick<DeviceCandidate, "width" | "height">,
+  x: number,
+  y: number,
+  canvasWidth: number,
+  canvasHeight: number,
+): [number, number] {
+  const clamp = (value: number, max: number) => Math.round(Math.min(Math.max(0, max), Math.max(0, value)));
+  return [clamp(x - device.width / 2, canvasWidth - device.width), clamp(y - device.height / 2, canvasHeight - device.height)];
+}
+
 /** Zariadenia simulatora, ktore na scheme este nie su. */
 export function unplacedDevices(live: SchemaLive, elements: readonly SchemaElementDto[]): DeviceCandidate[] {
   const placed = new Set(elements.filter((e) => isDevice(e.kind)).map(deviceKey));
@@ -175,4 +193,34 @@ export function straighten(x: number, y: number, neighbours: readonly { x: numbe
     }
   }
   return { x: nx, y: ny };
+}
+
+/** Stred otocenia prvku - stred jeho plochy podla polohy a rozmeru (text a lomena ciara rozmer nemaju). */
+export function rotationCenter(element: SchemaElementDto): { x: number; y: number } {
+  return { x: element.x + element.width / 2, y: element.y + element.height / 2 };
+}
+
+/**
+ * Plocha, ktoru prvok zabera aj s otocenim: najmensi obdlznik okolo otocenej plochy. Podla nej sa prvok vybera
+ * obdlznikom, prichytava a zarovnava; bez otocenia je to plocha prvku.
+ */
+export function boundsOf(element: SchemaElementDto): Box {
+  const box = boxOf(element);
+  if (!element.rotation || isPolyline(element.kind)) return box;
+  const center = rotationCenter(element);
+  const angle = (element.rotation * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const corners = [
+    [box.x, box.y],
+    [box.x + box.w, box.y],
+    [box.x + box.w, box.y + box.h],
+    [box.x, box.y + box.h],
+  ].map(([x, y]) => [center.x + (x - center.x) * cos - (y - center.y) * sin, center.y + (x - center.x) * sin + (y - center.y) * cos]);
+  const xs = corners.map((c) => c[0]);
+  const ys = corners.map((c) => c[1]);
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  const x = round(Math.min(...xs));
+  const y = round(Math.min(...ys));
+  return { x, y, w: round(Math.max(...xs)) - x, h: round(Math.max(...ys)) - y };
 }

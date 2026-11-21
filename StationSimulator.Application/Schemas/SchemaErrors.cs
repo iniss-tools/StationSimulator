@@ -17,6 +17,7 @@ public static class SchemaErrors
     public const string ElementColor = "schema.elementColor";
     public const string ElementDevice = "schema.elementDevice";
     public const string Opacity = "schema.opacity";
+    public const string BackgroundBox = "schema.backgroundBox";
     public const string BackgroundType = "schema.backgroundType";
 
     /// <summary>Najviac prvkov schemy.</summary>

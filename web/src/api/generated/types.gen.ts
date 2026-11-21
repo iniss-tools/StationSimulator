@@ -1499,6 +1499,10 @@ export type StationSchemaDto = {
     elements: Array<SchemaElementDto>;
     background: null | string;
     backgroundOpacity: number;
+    backgroundX: number;
+    backgroundY: number;
+    backgroundWidth: number;
+    backgroundHeight: number;
 };
 
 export type StationSchemaRequest = {
@@ -1507,6 +1511,10 @@ export type StationSchemaRequest = {
     height: number;
     elements: Array<SchemaElementDto>;
     backgroundOpacity: number;
+    backgroundX: number;
+    backgroundY: number;
+    backgroundWidth: number;
+    backgroundHeight: number;
 };
 
 export type StationXmlTableDto = {
