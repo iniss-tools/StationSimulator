@@ -40,13 +40,14 @@ import { DocumentKeys } from "@/components/editor/DocumentKeys";
 import { extremeOrder, moveElement, stepOrder } from "./edit";
 import { ElementProperties, type ElementPatch } from "./ElementProperties";
 import { FaceCanvas } from "./FaceCanvas";
-import { FaceContextMenu } from "./FaceContextMenu";
+import { EditorContextMenu } from "@/components/editor/EditorContextMenu";
 import { FaceProperties } from "./FaceProperties";
 import { ELEMENT_KINDS, KIND_ICONS, layerLabel, newElement, previewBoard, variableLabel } from "./faces";
 import { useHistory } from "@/components/editor/history";
 import { LayersPanel } from "@/components/editor/LayersPanel";
 import { NewFaceDialog } from "./NewFaceDialog";
-import { ShortcutsDialog } from "./ShortcutsDialog";
+import { ShortcutsDialog } from "@/components/editor/ShortcutsDialog";
+import { FACE_SHORTCUTS } from "./shortcut-groups";
 import { GRID_STEPS, loadView, saveView, type FaceView } from "./view";
 import { typing, zoomStep } from "@/components/editor/zoom";
 
@@ -488,7 +489,7 @@ export function FacesPage() {
         </aside>
 
         <div className="order-first flex min-h-0 flex-col gap-2 xl:order-none">
-          <FaceContextMenu
+          <EditorContextMenu
             className="h-[min(60vh,32rem)] min-h-0 xl:h-auto xl:flex-1"
             count={chosen.length}
             readOnly={readOnly}
@@ -517,7 +518,7 @@ export function FacesPage() {
               onLayout={onLayout}
               onOpen={open}
             />
-          </FaceContextMenu>
+          </EditorContextMenu>
         </div>
 
         <aside aria-label={t("faces.properties")} className="min-h-0 overflow-y-auto rounded-xl border bg-card p-3">
@@ -541,7 +542,7 @@ export function FacesPage() {
       </div>
 
       <DocumentKeys onKeyDown={onKey} />
-      <ShortcutsDialog open={help} onClose={() => setHelp(false)} />
+      <ShortcutsDialog open={help} onClose={() => setHelp(false)} title={t("faces.keys.title")} hint={t("faces.keys.hint")} groups={FACE_SHORTCUTS} />
       {creating && (
         <NewFaceDialog
           face={form}

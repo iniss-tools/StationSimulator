@@ -1,4 +1,4 @@
-// Kontextova ponuka platna editora ciel (prave tlacidlo): schranka, poradie kreslenia, zamok, skrytie, vyber a odstranenie.
+// Kontextova ponuka platna editora (cela tabul, schema stanice; prave tlacidlo): schranka, poradie kreslenia, zamok, skrytie, vyber a odstranenie.
 // Polozky, ktore sa na vyber nedaju pouzit, su vypnute; skratky ukazuje vpravo.
 import type { ReactNode } from "react";
 import {
@@ -20,7 +20,7 @@ import {
 } from "lucide-react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuShortcut, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { t, type TextKey } from "@/i18n";
-import type { FaceAction } from "./actions";
+import type { EditorAction } from "./shortcuts";
 
 interface Props {
   children: ReactNode;
@@ -34,12 +34,12 @@ interface Props {
   /** Vsetky vybrane prvky su zamknute / skryte v editore. */
   locked: boolean;
   hidden: boolean;
-  onAction: (action: FaceAction) => void;
+  onAction: (action: EditorAction) => void;
 }
 
-export function FaceContextMenu({ children, className, count, readOnly, canPaste, canForward, canBackward, locked, hidden, onAction }: Props) {
+export function EditorContextMenu({ children, className, count, readOnly, canPaste, canForward, canBackward, locked, hidden, onAction }: Props) {
   const edit = count > 0 && !readOnly;
-  const item = (action: FaceAction, Icon: LucideIcon, label: TextKey, enabled: boolean, shortcut?: string) => (
+  const item = (action: EditorAction, Icon: LucideIcon, label: TextKey, enabled: boolean, shortcut?: string) => (
     <ContextMenuItem disabled={!enabled} variant={action === "remove" ? "destructive" : "default"} onClick={() => onAction(action)}>
       <Icon />
       {t(label)}
