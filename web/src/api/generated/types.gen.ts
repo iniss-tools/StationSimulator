@@ -1119,6 +1119,10 @@ export type ServerUpdateDto = {
     error: null | string;
 };
 
+export type SetBoardPowerRequest = {
+    on: boolean;
+};
+
 export type SetBoardRequest = {
     line: number;
     address: number;
@@ -1151,6 +1155,10 @@ export type SetDesignRequest = {
     seam: DesignSeamDto;
     header: DesignHeaderDto;
     flaps: null | DesignFlapsDto;
+};
+
+export type SetLineOutageRequest = {
+    outage: boolean;
 };
 
 export type SetLineRequest = {
@@ -3942,6 +3950,33 @@ export type SetLineResponses = {
 
 export type SetLineResponse = SetLineResponses[keyof SetLineResponses];
 
+export type SetLineOutageData = {
+    body: SetLineOutageRequest;
+    path: {
+        number: number;
+    };
+    query?: never;
+    url: '/api/lines/{number}/outage';
+};
+
+export type SetLineOutageErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type SetLineOutageError = SetLineOutageErrors[keyof SetLineOutageErrors];
+
+export type SetLineOutageResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SetLineOutageResponse = SetLineOutageResponses[keyof SetLineOutageResponses];
+
 export type GetAccessKeysData = {
     body?: never;
     path?: never;
@@ -4643,6 +4678,33 @@ export type SetBoardFaultResponses = {
 };
 
 export type SetBoardFaultResponse = SetBoardFaultResponses[keyof SetBoardFaultResponses];
+
+export type SetBoardPowerData = {
+    body: SetBoardPowerRequest;
+    path: {
+        id: string;
+    };
+    query?: never;
+    url: '/api/boards/{id}/power';
+};
+
+export type SetBoardPowerErrors = {
+    /**
+     * Error (ProblemDetails)
+     */
+    default: ApiProblem;
+};
+
+export type SetBoardPowerError = SetBoardPowerErrors[keyof SetBoardPowerErrors];
+
+export type SetBoardPowerResponses = {
+    /**
+     * No Content
+     */
+    204: void;
+};
+
+export type SetBoardPowerResponse = SetBoardPowerResponses[keyof SetBoardPowerResponses];
 
 export type CancelRestoreData = {
     body?: never;

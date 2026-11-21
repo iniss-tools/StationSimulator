@@ -15,6 +15,7 @@ import {
   Layers,
   Lock,
   LockOpen,
+  Move,
   Scaling,
   Trash2,
   type LucideIcon,
@@ -53,6 +54,9 @@ interface Props {
   background: SchemaBackground | null;
   /** Preco sa vybrany obrazok neda pouzit; null = v poriadku. */
   imageError: string | null;
+  /** Plocha obrazka pozadia sa prave upravuje mysou na platne. */
+  pictureEdit: boolean;
+  onPictureEdit: (edit: boolean) => void;
   /** Novy obrazok pozadia zo suboru (ulozi sa so schemou). */
   onImage: (file: File) => void;
   onRemoveImage: () => void;
@@ -68,7 +72,7 @@ interface Props {
 const DEFAULT = "default";
 const CUSTOM = "custom";
 
-type FieldsProps = Pick<Props, "schema" | "background" | "imageError" | "onSchema" | "onImage" | "onRemoveImage">;
+type FieldsProps = Pick<Props, "schema" | "background" | "imageError" | "pictureEdit" | "onSchema" | "onImage" | "onRemoveImage" | "onPictureEdit">;
 
 /** Obrazok pozadia na cele platno (bez vlastnej polohy a rozmeru). */
 const WHOLE_CANVAS = { backgroundX: 0, backgroundY: 0, backgroundWidth: 0, backgroundHeight: 0 };
@@ -102,7 +106,7 @@ function ColorField({ label, value, onChange }: { label: string; value: string |
   );
 }
 
-function SchemaFields({ schema, background, imageError, onSchema, onImage, onRemoveImage }: FieldsProps) {
+function SchemaFields({ schema, background, imageError, pictureEdit, onSchema, onImage, onRemoveImage, onPictureEdit }: FieldsProps) {
   const input = useRef<HTMLInputElement>(null);
   const box = backgroundBox(schema);
   /** Vyska platna podla pomeru stran obrazka (sirka ostava), obrazok na cele platno. */
@@ -180,6 +184,17 @@ function SchemaFields({ schema, background, imageError, onSchema, onImage, onRem
               onChange={(v, tr) => onSchema({ backgroundOpacity: Math.min(100, Math.max(0, v)) / 100 }, tr)}
             />
             <div className="col-span-2 flex flex-wrap gap-1">
+              <Button
+                type="button"
+                variant={pictureEdit ? "secondary" : "ghost"}
+                size="sm"
+                aria-pressed={pictureEdit}
+                title={t("schema.background.move.hint")}
+                onClick={() => onPictureEdit(!pictureEdit)}
+              >
+                <Move />
+                {t("schema.background.move")}
+              </Button>
               <Button type="button" variant="ghost" size="sm" disabled={!placed} onClick={() => onSchema(WHOLE_CANVAS)}>
                 <Expand />
                 {t("schema.background.whole")}
@@ -198,9 +213,21 @@ function SchemaFields({ schema, background, imageError, onSchema, onImage, onRem
   );
 }
 
-export function SchemaProperties({ schema, background, imageError, elements, live, onPatch, onSchema, onImage, onRemoveImage, onAlign, onRemove }: Props) {
+export function SchemaProperties(props: Props) {
+  const { schema, background, imageError, pictureEdit, elements, live, onPatch, onSchema, onImage, onRemoveImage, onPictureEdit, onAlign, onRemove } = props;
   if (elements.length === 0)
-    return <SchemaFields schema={schema} background={background} imageError={imageError} onSchema={onSchema} onImage={onImage} onRemoveImage={onRemoveImage} />;
+    return (
+      <SchemaFields
+        schema={schema}
+        background={background}
+        imageError={imageError}
+        pictureEdit={pictureEdit}
+        onSchema={onSchema}
+        onImage={onImage}
+        onRemoveImage={onRemoveImage}
+        onPictureEdit={onPictureEdit}
+      />
+    );
 
   const single = elements.length === 1 ? elements[0] : null;
   const kind = common(elements.map((e) => e.kind));

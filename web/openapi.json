@@ -3168,6 +3168,51 @@
         }
       }
     },
+    "/api/lines/{number}/outage": {
+      "post": {
+        "tags": [
+          "Lines"
+        ],
+        "operationId": "SetLineOutage",
+        "parameters": [
+          {
+            "name": "number",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetLineOutageRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error (ProblemDetails)",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/keys": {
       "post": {
         "tags": [
@@ -4111,6 +4156,49 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BoardFaultDto"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "No Content"
+          },
+          "default": {
+            "description": "Error (ProblemDetails)",
+            "content": {
+              "application/problem\u002Bjson": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiProblem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/boards/{id}/power": {
+      "post": {
+        "tags": [
+          "Boards"
+        ],
+        "operationId": "SetBoardPower",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetBoardPowerRequest"
               }
             }
           },
@@ -9551,6 +9639,17 @@
           }
         }
       },
+      "SetBoardPowerRequest": {
+        "required": [
+          "on"
+        ],
+        "type": "object",
+        "properties": {
+          "on": {
+            "type": "boolean"
+          }
+        }
+      },
       "SetBoardRequest": {
         "required": [
           "line",
@@ -9700,6 +9799,17 @@
                 "$ref": "#/components/schemas/DesignFlapsDto"
               }
             ]
+          }
+        }
+      },
+      "SetLineOutageRequest": {
+        "required": [
+          "outage"
+        ],
+        "type": "object",
+        "properties": {
+          "outage": {
+            "type": "boolean"
           }
         }
       },

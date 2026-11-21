@@ -16,6 +16,8 @@ import {
   nextId,
   removePoint,
   resizeBox,
+  resizeRotated,
+  rotatePoint,
   straighten,
   unplacedDevices,
 } from "./schema-edit";
@@ -163,5 +165,36 @@ describe("otoceny prvok", () => {
     expect(bounds.h).toBeCloseTo(106.066, 2);
     expect(bounds.x + bounds.w / 2).toBeCloseTo(60, 2);
     expect(bounds.y + bounds.h / 2).toBeCloseTo(45, 2);
+  });
+});
+
+describe("zmena velkosti otoceneho prvku", () => {
+  const box = { x: 100, y: 100, w: 200, h: 100 };
+  /** Roh plochy na obrazovke po otoceni okolo jej stredu. */
+  const corner = (b: typeof box, rotation: number, right: boolean, bottom: boolean) =>
+    rotatePoint(b.x + (right ? b.w : 0), b.y + (bottom ? b.h : 0), b.x + b.w / 2, b.y + b.h / 2, rotation);
+
+  test("bez otocenia je to obycajna zmena rozmeru", () => {
+    expect(resizeRotated(box, 0, { right: true, bottom: true }, 30, 20)).toEqual({ x: 100, y: 100, w: 230, h: 120 });
+  });
+
+  test("pri otoceni o 90 stupnov meni sirku zvisly posun mysi", () => {
+    const next = resizeRotated(box, 90, { right: true }, 0, 40);
+    expect(next.w).toBeCloseTo(240, 3);
+    expect(next.h).toBeCloseTo(100, 3);
+  });
+
+  test("protilahly roh ostane na obrazovke na mieste", () => {
+    for (const rotation of [30, 90, 135, -45]) {
+      const next = resizeRotated(box, rotation, { right: true, bottom: true }, 37, 12);
+      const before = corner(box, rotation, false, false);
+      const after = corner(next, rotation, false, false);
+      expect(after.x).toBeCloseTo(before.x, 2);
+      expect(after.y).toBeCloseTo(before.y, 2);
+    }
+  });
+
+  test("rozmer neklesne pod najmensi ani pri otoceni", () => {
+    expect(resizeRotated(box, 45, { left: true }, 5000, 5000).w).toBe(4);
   });
 });

@@ -23,7 +23,7 @@ interface Props {
   live: SchemaLive;
   /** Obrazok pozadia pod kresbou (cely do svojej plochy so zachovanim pomeru stran). */
   background?: SchemaBackground | null;
-  /** Tabule ako znacky s nazvom a stavom namiesto ziveho obsahu. */
+  /** Tabule ako male indikatory (bodka stavu, ikona, nazov) namiesto ziveho obsahu. */
   symbols?: boolean;
   /** Vybrany prvok (otvoreny detail). */
   selected?: number | null;
@@ -133,11 +133,79 @@ interface DeviceProps {
   selected: boolean;
   /** Tabula so zivym obsahom - znacka je len ram, obsah kresli vrstva nad platnom. */
   live: boolean;
+  /** Tabula ako maly indikator namiesto znacky cez celu plochu. */
+  compact: boolean;
   onSelect?: (element: SchemaElementDto) => void;
 }
 
+// bodka stavu na indikatore tabule
+const DOTS: Record<ElementTone, string> = {
+  ok: "fill-emerald-500",
+  active: "fill-emerald-500",
+  bad: "fill-red-500",
+  off: "fill-muted-foreground/50",
+  missing: "fill-transparent stroke-muted-foreground",
+};
+
+/**
+ * Tabula ako maly indikator v strede svojej plochy: bodka stavu, ikona a nazov. Stav hovori farba bodky a popis po
+ * prejdeni mysou; velkost urcuje pismo prvku, nie jeho plocha.
+ */
+function Indicator({ element: e, state, label, selected, onSelect }: Omit<DeviceProps, "live" | "compact">) {
+  const size = e.size || FONT;
+  const height = size * 1.7;
+  const dot = size * 0.32;
+  const icon = size * 1.05;
+  const width = 8 + dot * 2 + 5 + icon + 5 + label.length * size * 0.56 + 10;
+  const x = e.x + e.width / 2 - width / 2;
+  const y = e.y + e.height / 2 - height / 2;
+  const middle = y + height / 2;
+  const title = `${label} – ${t(`schema.state.${state.reason}`)}`;
+  const keyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    onSelect?.(e);
+  };
+  return (
+    <g
+      transform={rotation(e)}
+      role={onSelect ? "button" : "img"}
+      tabIndex={onSelect ? 0 : undefined}
+      aria-label={title}
+      data-indicator
+      className={cn("outline-none", onSelect && "cursor-pointer focus-visible:[&>rect]:stroke-ring")}
+      onClick={onSelect && (() => onSelect(e))}
+      onKeyDown={onSelect && keyDown}
+    >
+      <title>{title}</title>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={height / 2}
+        strokeWidth={selected || state.tone === "bad" ? 2 : 1}
+        className={cn("fill-card", state.tone === "bad" ? "stroke-red-500" : "stroke-border", selected && "stroke-primary")}
+      />
+      <circle cx={x + 8 + dot} cy={middle} r={dot} strokeWidth={1} className={DOTS[state.tone]} />
+      <Monitor x={x + 8 + dot * 2 + 5} y={middle - icon / 2} width={icon} height={icon} className="text-muted-foreground" />
+      <text
+        x={x + 8 + dot * 2 + 5 + icon + 5}
+        y={middle}
+        fontSize={size}
+        dominantBaseline="central"
+        className={state.tone === "off" || state.tone === "missing" ? "fill-muted-foreground" : "fill-foreground"}
+      >
+        {label}
+      </text>
+    </g>
+  );
+}
+
 /** Znacka zariadenia so stavom; da sa vybrat mysou aj klavesnicou. */
-function Device({ element: e, state, label, selected, live, onSelect }: DeviceProps) {
+function Device(props: DeviceProps) {
+  const { element: e, state, label, selected, live, compact, onSelect } = props;
+  if (compact) return <Indicator element={e} state={state} label={label} selected={selected} onSelect={onSelect} />;
   const Icon = ICONS[e.kind];
   const size = e.size || FONT;
   const icon = Math.max(0, Math.min(e.height - 8, size * 1.3));
@@ -246,7 +314,16 @@ export function SchemaCanvas({ schema, live, background, symbols = false, select
             );
           const state = elementState(e, live);
           return (
-            <Device key={e.id} element={e} state={state} label={elementLabel(e, live)} selected={selected === e.id} live={isLive(e.id)} onSelect={onSelect} />
+            <Device
+              key={e.id}
+              element={e}
+              state={state}
+              label={elementLabel(e, live)}
+              selected={selected === e.id}
+              live={isLive(e.id)}
+              compact={e.kind === "board" && (symbols || e.view === "symbol")}
+              onSelect={onSelect}
+            />
           );
         })}
       </svg>

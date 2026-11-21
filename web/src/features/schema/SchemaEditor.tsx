@@ -77,6 +77,8 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
   const clipboard = useClipboard();
   const [view, setViewState] = useState(loadEditorView);
   const [help, setHelp] = useState(false);
+  // plocha obrazka pozadia sa upravuje mysou na platne
+  const [pictureEdit, setPictureEdit] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   // adresy obrazkov vybranych zo suboru - uvolnia sa pri odchode z editora (kroky spat sa na ne mozu vratit)
   const urls = useRef<string[]>([]);
@@ -288,8 +290,9 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
       patchSelected((el) => (el.locked ? el : moveBy(el, arrow[0] * step, arrow[1] * step, 0.001)), e.repeat);
       return;
     }
-    if (e.key === "Escape" && chosen.length) {
+    if (e.key === "Escape" && (chosen.length || pictureEdit)) {
       setSelection([]);
+      setPictureEdit(false);
       return;
     }
     const action = e.key === "Delete" || e.key === "Backspace" ? "remove" : shortcutAction(e);
@@ -478,6 +481,10 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
               selection={chosen}
               hidden={hidden}
               view={view}
+              backgroundEdit={pictureEdit && chosen.length === 0}
+              onBackground={(box, transient) =>
+                change({ backgroundX: box.x, backgroundY: box.y, backgroundWidth: Math.max(1, box.w), backgroundHeight: Math.max(1, box.h) }, transient)
+              }
               onSelect={setSelection}
               onDropDevice={dropDevice}
               onChange={(changes, transient) => updateMany(changes, transient)}
@@ -490,6 +497,8 @@ export function SchemaEditor({ schema, live, onClose }: { schema: StationSchemaD
             schema={form}
             background={background}
             imageError={imageError}
+            pictureEdit={pictureEdit}
+            onPictureEdit={setPictureEdit}
             onImage={pickImage}
             onRemoveImage={removeImage}
             elements={chosen.map((i) => form.elements[i])}

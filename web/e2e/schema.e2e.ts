@@ -96,6 +96,17 @@ test("schema stanice: editor, zivy stav a kiosk", async ({ page }) => {
   await page.getByRole("button", { name: "Znova (Ctrl+Y)" }).click();
   await expect(picture).toHaveCount(1);
   await page.getByLabel("Šírka").last().fill("400");
+  // plocha obrazka sa da tahat mysou na platne
+  await page.getByRole("button", { name: "Upraviť myšou" }).click();
+  const frame = page.locator("[data-picture]");
+  const before = await frame.boundingBox();
+  await page.mouse.move(before!.x + 20, before!.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(before!.x + 60, before!.y + 50, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByLabel("X", { exact: true })).not.toHaveValue("0");
+  await page.keyboard.press("Escape");
+  await expect(frame).toHaveCount(0);
   await page.getByRole("button", { name: "Uložiť" }).click();
   await expect(page.getByText("Schéma je uložená.")).toBeVisible();
   expect(await schemaBackground(page)).toMatchObject({ backgroundWidth: 400 });
@@ -129,6 +140,7 @@ test("schema stanice: editor, zivy stav a kiosk", async ({ page }) => {
   await expect(page.locator("main canvas")).toHaveCount(1);
   await page.getByRole("button", { name: "Značky" }).click();
   await expect(page.locator("main canvas")).toHaveCount(0);
+  await expect(page.locator("[data-indicator]")).toHaveCount(1);
   await expect(broken).toBeVisible();
   await page.getByRole("button", { name: "Značky" }).click();
   await expect(page.locator("main canvas")).toHaveCount(1);
@@ -138,6 +150,11 @@ test("schema stanice: editor, zivy stav a kiosk", async ({ page }) => {
   const detail = page.getByRole("dialog");
   await expect(detail.getByText("porucha", { exact: true })).toBeVisible();
   await expect(detail.getByText(`Linka ${LINE} – E2E schéma`)).toBeVisible();
+  // vypadok napajania a spat
+  await detail.getByRole("button", { name: "Vypnúť napájanie" }).click();
+  await expect(detail.getByText("bez napájania", { exact: true })).toBeVisible();
+  await detail.getByRole("button", { name: "Zapnúť napájanie" }).click();
+  await expect(detail.getByText("porucha", { exact: true })).toBeVisible();
   // poruchu ide zrusit priamo v detaile
   await detail.getByRole("combobox", { name: "Porucha" }).click();
   await page.getByRole("option", { name: "Bez poruchy" }).click();

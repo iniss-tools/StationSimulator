@@ -14,6 +14,8 @@ namespace StationSimulator.Application.Scenarios;
 /// (porucha tabule z neskor spusteneho scenara prepise skorsi) a v simulatore zmeni len to, co sa od posledneho tiku
 /// zmenilo. Tabula, ktoru uz ziadny scenar neovlada, dostane spat poruchu spred scenara; po vypadku napajania sa zapne,
 /// linka po vypadku sa spusti znova a ustredna AK Signal plati opat podla profilu. Ruca zmena poruchy pocas scenara plati do dalsej zmeny scenara.
+/// Vypadok napajania tabule a vypadok linky sa da zapnut aj rucne (zo schemy stanice) - plati spolu so scenarmi, kym
+/// ho obsluha nevypne, a neuklada sa.
 /// </summary>
 public sealed class ScenarioRunner(Simulator simulator, TransportManager transport, ILiveNotifier live, TimeProvider time) : IDisposable
 {
@@ -26,6 +28,10 @@ public sealed class ScenarioRunner(Simulator simulator, TransportManager transpo
     private readonly Dictionary<string, BoardFault> _original = new(StringComparer.Ordinal);
     private readonly HashSet<string> _poweredOff = new(StringComparer.Ordinal);
     private readonly HashSet<int> _outages = [];
+
+    // co zapla obsluha rucne - plati popri scenaroch
+    private readonly HashSet<string> _manualPowerOff = new(StringComparer.Ordinal);
+    private readonly HashSet<int> _manualOutages = [];
     private readonly Dictionary<string, AkSignalOverride> _devices = new(StringComparer.Ordinal);
     private volatile bool _disposed;
 
@@ -46,6 +52,50 @@ public sealed class ScenarioRunner(Simulator simulator, TransportManager transpo
             if (!_runs.TryGetValue(id, out var run))
                 return null;
             return new ScenarioRunDto(run.StartedAt, run.Scenario.LengthMs, run.Moment.Cycle, run.Moment.ActiveSteps.ToArray());
+        }
+    }
+
+    /// <summary>Rucny vypadok napajania tabule (off) alebo jeho koniec; tabula ovladana scenarom ostane vypnuta aj potom.</summary>
+    public async Task SetManualPowerAsync(string boardId, bool off)
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            lock (_lock)
+            {
+                if (off)
+                    _manualPowerOff.Add(boardId);
+                else
+                    _manualPowerOff.Remove(boardId);
+            }
+
+            await ReconcileAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    /// <summary>Rucny vypadok linky alebo jeho koniec; linka vo vypadku zo scenara ostane vo vypadku aj potom.</summary>
+    public async Task SetManualOutageAsync(int line, bool outage)
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            lock (_lock)
+            {
+                if (outage)
+                    _manualOutages.Add(line);
+                else
+                    _manualOutages.Remove(line);
+            }
+
+            await ReconcileAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _gate.Release();
         }
     }
 
@@ -121,7 +171,12 @@ public sealed class ScenarioRunner(Simulator simulator, TransportManager transpo
         try
         {
             lock (_lock)
+            {
                 _runs.Clear();
+                _manualPowerOff.Clear();
+                _manualOutages.Clear();
+            }
+
             await ReconcileAsync().ConfigureAwait(false);
         }
         finally
@@ -188,6 +243,9 @@ public sealed class ScenarioRunner(Simulator simulator, TransportManager transpo
                 foreach (var (board, device) in effects.Devices)
                     devices[board] = devices.TryGetValue(board, out var earlier) ? earlier.Then(device) : device;
             }
+
+            powerOff.UnionWith(_manualPowerOff);
+            outages.UnionWith(_manualOutages);
         }
 
         ApplyFaults(faults);

@@ -2,7 +2,10 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using StationSimulator.Contracts.Audit;
+using StationSimulator.Contracts.Boards;
+using StationSimulator.Contracts.Lines;
 using StationSimulator.Contracts.Schemas;
+using StationSimulator.Contracts.State;
 
 namespace StationSimulator.Tests.Server;
 
@@ -132,6 +135,31 @@ public sealed class SchemasApiTests
         var body = new ByteArrayContent(content);
         body.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
         return client.PutAsync($"/api/schemas/{id}/background?name={name}", body, TestContext.CancellationToken);
+    }
+
+    [TestMethod]
+    public async Task Ovladanie_RucnyVypadokNapajaniaALinky()
+    {
+        await using var server = SimulatorServer.Start();
+        var client = server.Client();
+        var line = new SetLineRequest { Number = 31, TableClass = 4, Endpoint = "TCP://127.0.0.1:47931", Name = "Skuska", AutoLearn = false, Manufacturer = "ELEN10" };
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.PutAsJsonAsync("/api/lines/31", line, TestContext.CancellationToken)).StatusCode);
+        var board = new SetBoardRequest { Line = 31, Address = 5, Manufacturer = "ELEN10", Name = "Tabula" };
+        var put = await client.PutAsJsonAsync("/api/boards/31/5", board, TestContext.CancellationToken);
+        Assert.AreEqual(HttpStatusCode.NoContent, put.StatusCode, await put.Content.ReadAsStringAsync(TestContext.CancellationToken));
+        async Task<StateDto> State() => (await client.GetFromJsonAsync<StateDto>("/api/state", TestContext.CancellationToken))!;
+
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/boards/31-5/power", new SetBoardPowerRequest(false), TestContext.CancellationToken)).StatusCode);
+        Assert.IsTrue((await State()).Boards.Single(b => b.Id == "31-5").PoweredOff);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/boards/31-5/power", new SetBoardPowerRequest(true), TestContext.CancellationToken)).StatusCode);
+        Assert.IsFalse((await State()).Boards.Single(b => b.Id == "31-5").PoweredOff);
+        Assert.AreEqual("board.notFound", await CodeOf(await client.PostAsJsonAsync("/api/boards/31-9/power", new SetBoardPowerRequest(false), TestContext.CancellationToken)));
+
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/lines/31/outage", new SetLineOutageRequest(true), TestContext.CancellationToken)).StatusCode);
+        Assert.AreEqual(LineStatus.Outage, (await State()).Lines.Single(l => l.Number == 31).Status);
+        Assert.AreEqual(HttpStatusCode.NoContent, (await client.PostAsJsonAsync("/api/lines/31/outage", new SetLineOutageRequest(false), TestContext.CancellationToken)).StatusCode);
+        Assert.AreNotEqual(LineStatus.Outage, (await State()).Lines.Single(l => l.Number == 31).Status);
+        Assert.AreEqual("line.notFound", await CodeOf(await client.PostAsJsonAsync("/api/lines/77/outage", new SetLineOutageRequest(true), TestContext.CancellationToken)));
     }
 
     [TestMethod]

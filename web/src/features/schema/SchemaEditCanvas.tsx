@@ -3,7 +3,8 @@
 // uchyt v strede useku prida bod, dvojklik bod odstrani). Pri tahani sa prvok prichytava k okrajom a stredom ostatnych
 // prvkov a platna (ruzove vodiace ciary) alebo k mriezke, s Alt bez prichytenia a po desatinach. Drzany Alt bez
 // tahania meria vzdialenost vyberu od prvku pod mysou (inak od platna). Otoceny prvok sa vybera a prichytava podla
-// obdlznika okolo otocenej plochy; uchyty na zmenu velkosti ma len neotoceny.
+// obdlznika okolo otocenej plochy, jeho uchyty su otocene s nim a menia rozmer v jeho osiach. V rezime uprav pozadia
+// sa namiesto prvkov taha a meni plocha obrazka pozadia.
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { SchemaElementDto, StationSchemaDto } from "@/api";
 import { intersecting, union } from "@/components/editor/align";
@@ -25,6 +26,8 @@ import {
   movePoint,
   removePoint,
   resizeBox,
+  resizeRotated,
+  rotatePoint,
   rotationCenter,
   straighten,
   type Handle,
@@ -43,6 +46,10 @@ interface Props {
   hidden: ReadonlySet<number>;
   /** Mriezka, prichytavanie a vodiace ciary. */
   view: SchemaEditorView;
+  /** Uprava plochy obrazka pozadia mysou - prvky sa vtedy nedaju vybrat. */
+  backgroundEdit: boolean;
+  /** Nova plocha obrazka pozadia; transient = pokracovanie tahania. */
+  onBackground: (box: Box, transient: boolean) => void;
   onSelect: (selection: number[]) => void;
   /** Zariadenie zo zoznamu pustene na bod platna (kluc zariadenia, suradnice v jednotkach platna). */
   onDropDevice: (key: string, x: number, y: number) => void;
@@ -70,6 +77,10 @@ interface Drag {
   handle: Handle | null;
   /** Tahany bod lomenej ciary (originals ma jediny prvok, uz aj s pridanym bodom). */
   point: number | null;
+  /** Taha sa plocha obrazka pozadia (originals je prazdne). */
+  picture: boolean;
+  /** Otocenie prvku, ktoreho uchyt sa taha (stupne). */
+  rotation: number;
   originals: Map<number, SchemaElementDto>;
   /** Plocha tahanych prvkov na zaciatku. */
   box: Box;
@@ -102,7 +113,8 @@ const handleStyle = (h: Handle, b: Box, scale: number): CSSProperties => ({
 /** Dlzka v jednotkach platna na stitok (bez zbytocnych desatin). */
 const number = (value: number) => String(Math.round(value * 10) / 10);
 
-export function SchemaEditCanvas({ schema, live, background, scale, selection, hidden, view, onSelect, onDropDevice, onChange }: Props) {
+export function SchemaEditCanvas(props: Props) {
+  const { schema, live, background, scale, selection, hidden, view, backgroundEdit, onSelect, onDropDevice, onBackground, onChange } = props;
   const root = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const lastPoint = useRef<{ element: number; point: number; time: number } | null>(null);
@@ -184,6 +196,8 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       started: false,
       handle,
       point: null,
+      picture: false,
+      rotation: handle && !isPolyline(elements[index].kind) ? elements[index].rotation : 0,
       originals: new Map(moving.map((i) => [i, elements[i]])),
       // uchyt meni neotocenu plochu, posun sa prichytava podla plochy s otocenim
       box: handle ? boxOf(elements[index]) : union(moving.map((i) => boundsOf(elements[i]))),
@@ -215,10 +229,33 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       y: e.clientY,
       started: false,
       handle: null,
+      picture: false,
+      rotation: 0,
       point: insert ? point + 1 : point,
       originals: new Map([[index, original]]),
       box: boxOf(original),
       targets: targetsWithout(new Set([index])),
+      changed: false,
+    };
+  };
+
+  /** Tahanie plochy obrazka pozadia (handle = uchyt, inak posun). */
+  const beginPicture = (e: PointerEvent<HTMLElement>, handle: Handle | null) => {
+    if (e.button !== 0 || !background) return;
+    e.stopPropagation();
+    capture(e);
+    drag.current = {
+      pointer: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      started: false,
+      handle,
+      point: null,
+      picture: true,
+      rotation: 0,
+      originals: new Map(),
+      box: { x: background.x, y: background.y, w: background.width, h: background.height },
+      targets: targetsWithout(new Set()),
       changed: false,
     };
   };
@@ -249,6 +286,25 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       if (r.guide) guides.push(r.guide);
       return r.guide || options.grid ? r.delta : snap(value + delta, step) - value;
     };
+    if (d.picture) {
+      // plocha obrazka: posun sa prichytava ako prvok, uchyt meni jej okraje
+      let box: Box;
+      if (!h) {
+        const snapped = snapMove(d.box, dx, dy, d.targets, "left", "top", options);
+        guides.push(...snapped.guides);
+        dx = guides.some((g) => g.axis === "x") || options.grid ? snapped.dx : snap(d.box.x + dx, step) - d.box.x;
+        dy = guides.some((g) => g.axis === "y") || options.grid ? snapped.dy : snap(d.box.y + dy, step) - d.box.y;
+        box = { ...d.box, x: d.box.x + dx, y: d.box.y + dy };
+      } else {
+        if (h.left || h.right) dx = edge("x", h.left ? d.box.x : d.box.x + d.box.w, dx, d.box);
+        if (h.top || h.bottom) dy = edge("y", h.top ? d.box.y : d.box.y + d.box.h, dy, d.box);
+        box = resizeBox(d.box, h, dx, dy);
+      }
+      setLines(guides.length ? { guides, gaps: [] } : null);
+      onBackground(box, d.changed);
+      d.changed = true;
+      return;
+    }
     if (d.point !== null) {
       const [[index, original]] = [...d.originals];
       const start = original.points[d.point];
@@ -269,6 +325,11 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       dx = guides.some((g) => g.axis === "x") || options.grid ? snapped.dx : snap(d.box.x + dx, step) - d.box.x;
       dy = guides.some((g) => g.axis === "y") || options.grid ? snapped.dy : snap(d.box.y + dy, step) - d.box.y;
       for (const [i, original] of d.originals) changes.set(i, moveBy(original, dx, dy, 0.001));
+    } else if (d.rotation) {
+      // otoceny prvok: rozmer v jeho osiach, protilahly okraj ostava na mieste; bez prichytavania
+      const resized = resizeRotated(d.box, d.rotation, h, dx, dy);
+      const whole = { ...resized, w: snap(resized.w, step), h: snap(resized.h, step) };
+      for (const [i, original] of d.originals) changes.set(i, fitTo(original, d.box, whole, 0.001));
     } else {
       if (h.left || h.right) dx = edge("x", h.left ? d.box.x : d.box.x + d.box.w, dx, d.box);
       if (h.top || h.bottom) dy = edge("y", h.top ? d.box.y : d.box.y + d.box.h, dy, d.box);
@@ -303,8 +364,17 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
   const only = selection.length === 1 && !elements[selection[0]]?.locked && bounds[selection[0]] ? elements[selection[0]] : null;
   // jedina vybrana lomena ciara ma uchyty v bodoch namiesto uchytov plochy
   const line = only && isPolyline(only.kind) ? only : null;
-  // uchyty plochy len pre neotoceny prvok - otoceny meni rozmer vo vlastnostiach
-  const resizable = only && !line && !only.rotation ? boxOf(only) : null;
+  // uchyty plochy; otoceny text ich nema (velkost pisma sa meni vo vlastnostiach)
+  const resizable = only && !line && !(only.rotation && only.kind === "text") ? boxOf(only) : null;
+  /** Poloha uchytu aj s otocenim prvku okolo jeho stredu. */
+  const handleAt = (h: Handle, b: Box, rotation: number): CSSProperties => {
+    const style = handleStyle(h, b, scale);
+    if (!rotation) return style;
+    const center = { x: (b.x + b.w / 2) * scale, y: (b.y + b.h / 2) * scale };
+    const turned = rotatePoint(Number(style.left) + 4, Number(style.top) + 4, center.x, center.y, rotation);
+    return { ...style, left: turned.x - 4, top: turned.y - 4, cursor: "crosshair" };
+  };
+  const picture: Box | null = backgroundEdit && background ? { x: background.x, y: background.y, w: background.width, h: background.height } : null;
   const dot = (x: number, y: number, size: number): CSSProperties => ({ left: x * scale - size / 2, top: y * scale - size / 2, width: size, height: size });
 
   // meranie s Alt: vyber voci prvku pod mysou, inak voci platnu
@@ -321,7 +391,7 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
       className="relative shrink-0 touch-none select-none"
       style={{ width: schema.width * scale, height: schema.height * scale }}
       onPointerDown={(e) => {
-        if (e.button !== 0 || !root.current) return;
+        if (e.button !== 0 || !root.current || picture) return;
         capture(e);
         const rect = root.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
@@ -366,7 +436,7 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
         />
       )}
       {elements.map((element, i) => {
-        if (hidden.has(i) || element.locked) return null;
+        if (hidden.has(i) || element.locked || picture) return null;
         return (
           <div
             key={element.id}
@@ -417,10 +487,29 @@ export function SchemaEditCanvas({ schema, live, background, scale, selection, h
             key={k}
             data-handle={k}
             className="absolute size-2 rounded-xs border border-primary bg-background"
-            style={handleStyle(h, resizable, scale)}
+            style={handleAt(h, resizable, only?.rotation ?? 0)}
             onPointerDown={(e) => begin(e, selection[0], h)}
           />
         ))}
+      {picture && (
+        <>
+          <div
+            data-picture
+            className="absolute cursor-move border-2 border-dashed border-primary"
+            style={css(picture)}
+            onPointerDown={(e) => beginPicture(e, null)}
+          />
+          {HANDLES.map((h, k) => (
+            <div
+              key={k}
+              data-picture-handle={k}
+              className="absolute size-2 rounded-xs border border-primary bg-background"
+              style={handleStyle(h, picture, scale)}
+              onPointerDown={(e) => beginPicture(e, h)}
+            />
+          ))}
+        </>
+      )}
       {lines?.guides.map((g, k) => (
         <div
           key={k}

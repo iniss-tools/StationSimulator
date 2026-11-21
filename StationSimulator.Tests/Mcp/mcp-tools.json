@@ -3596,6 +3596,42 @@
       }
     },
     {
+      "name": "delete_schema",
+      "title": "Delete station schema",
+      "description": "Deletes a station schema with its background image. Devices and lines of the simulator are not touched.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Schema number from list_schemas.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "description": "What was done.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "done"
+        ]
+      },
+      "annotations": {
+        "title": "Delete station schema",
+        "destructiveHint": true,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
       "name": "delete_virtual_board",
       "title": "Delete virtual board",
       "description": "Deletes a virtual board; devices showing it lose the page.",
@@ -11587,6 +11623,295 @@
       },
       "annotations": {
         "title": "Save fault scenario",
+        "destructiveHint": false,
+        "idempotentHint": false,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "save_schema",
+      "title": "Save station schema",
+      "description": "Creates a station schema (without id) or replaces an existing one with the given canvas and elements. Coordinates are in canvas units from the top left corner. Drawing kinds: track and path use points (at least two), platform, building and area use x, y, width and height, text uses x, y and text. Device kinds (board, audio, light, amplifier, commLine) need line and, except commLine, address of a simulator device; audio and light may name a circuit. Element ids must be unique positive numbers. The background image is kept; it can only be changed in the web editor.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "Schema name.",
+            "type": "string"
+          },
+          "width": {
+            "description": "Canvas width in canvas units (100-20000).",
+            "type": "integer"
+          },
+          "height": {
+            "description": "Canvas height in canvas units (100-20000).",
+            "type": "integer"
+          },
+          "elements": {
+            "description": "Elements in drawing order - later elements cover earlier ones.",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "track",
+                    "platform",
+                    "building",
+                    "area",
+                    "path",
+                    "text",
+                    "board",
+                    "audio",
+                    "light",
+                    "amplifier",
+                    "commLine"
+                  ]
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                },
+                "rotation": {
+                  "type": "number"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                },
+                "text": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "fill": {
+                  "type": "string"
+                },
+                "stroke": {
+                  "type": "number"
+                },
+                "line": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "circuit": {
+                  "type": "string"
+                },
+                "view": {
+                  "type": "string",
+                  "enum": [
+                    "live",
+                    "symbol"
+                  ]
+                },
+                "locked": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "id": {
+            "description": "Number of the schema to replace; omit to create a new one.",
+            "type": [
+              "integer",
+              "null"
+            ],
+            "default": null
+          }
+        },
+        "required": [
+          "name",
+          "width",
+          "height",
+          "elements"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "width": {
+            "type": "integer"
+          },
+          "height": {
+            "type": "integer"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "integer"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "track",
+                    "platform",
+                    "building",
+                    "area",
+                    "path",
+                    "text",
+                    "board",
+                    "audio",
+                    "light",
+                    "amplifier",
+                    "commLine"
+                  ]
+                },
+                "x": {
+                  "type": "number"
+                },
+                "y": {
+                  "type": "number"
+                },
+                "width": {
+                  "type": "number"
+                },
+                "height": {
+                  "type": "number"
+                },
+                "rotation": {
+                  "type": "number"
+                },
+                "points": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "x": {
+                        "type": "number"
+                      },
+                      "y": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y"
+                    ]
+                  }
+                },
+                "text": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "number"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "fill": {
+                  "type": "string"
+                },
+                "stroke": {
+                  "type": "number"
+                },
+                "line": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "address": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "circuit": {
+                  "type": "string"
+                },
+                "view": {
+                  "type": "string",
+                  "enum": [
+                    "live",
+                    "symbol"
+                  ]
+                },
+                "locked": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "background": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "backgroundOpacity": {
+            "type": "number"
+          },
+          "backgroundX": {
+            "type": "number"
+          },
+          "backgroundY": {
+            "type": "number"
+          },
+          "backgroundWidth": {
+            "type": "number"
+          },
+          "backgroundHeight": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "width",
+          "height",
+          "elements"
+        ]
+      },
+      "annotations": {
+        "title": "Save station schema",
         "destructiveHint": false,
         "idempotentHint": false,
         "openWorldHint": false,

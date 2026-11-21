@@ -94,6 +94,7 @@ a vlastným `JsonConverter`, správy `/ws` polymorfné cez `type`. Používa ich
   a zoznam schém nesie len jeho verziu; krytie je v definícii schémy.
   Kiosk `#/plan/N` číta obrázok s kľúčom v `access_token`; export a import schémy robí web (`schema-transfer.ts`).
 - `Scenarios/ScenarioRunner` – zlúči účinky bežiacich scenárov a mení len rozdiely, pôvodné poruchy vráti.
+  Drží aj ručný výpadok napájania a linky zo schémy stanice (`SetBoardPowerCommand`, `SetLineOutageCommand`); neukladá sa.
 - `Signage/` – informačné panely ako INISSView 2 (len Application, Persistence a web): čistý rozvrh
   `SignageSchedule`, správy, playlisty a skupiny v DB ako JSON požiadavky, `SignagePanelTracker` v pamäti, súbory
   `SignageMediaStore` v `media\`. Záloha `SignageBackup` (ZIP `signage.json` + `media/`), obnova nahradí s pôvodnými
@@ -208,7 +209,7 @@ React + TS 7, bun/Vite; texty SK/CZ v `src/i18n` – žiadny text UI natvrdo, ch
   `tools/pixel-fonts/bdf2ts.py` – ručne nemeniť. Snímka tabule = `BoardView` `ref` → `snapshot()`.
 - Rám `src/app`: TanStack Router s adresami za `#` (`router.tsx` – adresy nemeniť, sú v odkazoch zariadení
   `?key=…#/virtual/N`; premenovaná stránka dostane presmerovanie zo starej adresy – úvodná stránka Zariadenia
-  `#/devices`, `#/` a `#/boards` na ňu presmerujú), menu `navigation.ts` (stránku bez oprávnenia rám nezobrazí), kiosky `app/kiosk.ts`, service
+  `#/devices`, `#/` a `#/boards` na ňu presmerujú), menu `navigation.ts` (položka má jednu alebo viac stránok, viac stránok = karty v záhlaví rámu; stránku bez oprávnenia rám nezobrazí), kiosky `app/kiosk.ts`, service
   worker `public/sw.js` (len stránka a `/assets`), upozornenia na výpadky `app/line-alerts.ts` + `app/notifications.ts`.
   Zvuk hlásení `app/sound` (Web Audio, predvolene stlmený, hrá len hlásenia začaté po načítaní stránky a zapnutí
   zvuku, dohraté nezastavuje; čistá logika v `announcement-sound.ts`).

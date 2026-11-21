@@ -224,3 +224,32 @@ export function boundsOf(element: SchemaElementDto): Box {
   const y = round(Math.min(...ys));
   return { x, y, w: round(Math.max(...xs)) - x, h: round(Math.max(...ys)) - y };
 }
+
+/** Bod otoceny okolo stredu o uhol v stupnoch (v smere hodinovych ruciciek, os y smeruje dole). */
+export function rotatePoint(x: number, y: number, centerX: number, centerY: number, degrees: number): { x: number; y: number } {
+  const angle = (degrees * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  return { x: centerX + (x - centerX) * cos - (y - centerY) * sin, y: centerY + (x - centerX) * sin + (y - centerY) * cos };
+}
+
+/**
+ * Plocha otoceneho prvku po potiahnuti uchytu o (dx, dy) na obrazovke: posun sa prepocita do osi prvku, zmeni sa
+ * rozmer a plocha sa posunie tak, aby protilahly okraj ostal na obrazovke na mieste (prvok sa otaca okolo stredu,
+ * ktory sa zmenou rozmeru hybe). Bez otocenia je to obycajna zmena rozmeru.
+ */
+export function resizeRotated(box: Box, rotation: number, handle: Handle, dx: number, dy: number): Box {
+  if (!rotation) return resizeBox(box, handle, dx, dy);
+  const local = rotatePoint(dx, dy, 0, 0, -rotation);
+  const next = resizeBox(box, handle, local.x, local.y);
+  // bod, ktory sa nema pohnut: protilahly roh alebo stred protilahlej strany
+  const anchor = (b: Box) => ({
+    x: handle.left ? b.x + b.w : handle.right ? b.x : b.x + b.w / 2,
+    y: handle.top ? b.y + b.h : handle.bottom ? b.y : b.y + b.h / 2,
+  });
+  const center = (b: Box) => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 });
+  const before = rotatePoint(anchor(box).x, anchor(box).y, center(box).x, center(box).y, rotation);
+  const after = rotatePoint(anchor(next).x, anchor(next).y, center(next).x, center(next).y, rotation);
+  const round = (value: number) => Math.round(value * 1000) / 1000;
+  return { x: round(next.x + before.x - after.x), y: round(next.y + before.y - after.y), w: next.w, h: next.h };
+}

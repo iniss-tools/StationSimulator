@@ -1,8 +1,8 @@
-// Detail zariadenia vybraneho na scheme: stav, hrajuce hlasenie, ovladanie (porucha, zmazanie obsahu, prerusenie
-// hlasenia) a zariadenie v plnej velkosti.
-import { Eraser, ExternalLink } from "lucide-react";
+// Detail zariadenia vybraneho na scheme: stav, hrajuce hlasenie, ovladanie (porucha, vypadok napajania, zmazanie
+// obsahu, prerusenie hlasenia, vypadok linky) a zariadenie v plnej velkosti.
+import { Eraser, ExternalLink, Power, Unplug } from "lucide-react";
 import { toast } from "sonner";
-import { breakBoardAnnouncement, clearBoard, errorText, type BoardDto, type SchemaElementDto } from "@/api";
+import { breakBoardAnnouncement, clearBoard, errorText, setBoardPower, setLineOutage, type BoardDto, type LineDto, type SchemaElementDto } from "@/api";
 import { StatusBadge, type Tone } from "@/components/common/status-badge";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -51,14 +51,48 @@ function Controls({ element, board, control }: { element: SchemaElementDto; boar
           </Button>
         </div>
       ))}
-      {element.kind === "board" && (
-        <div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant={board.poweredOff ? "secondary" : "outline"}
+          size="sm"
+          aria-pressed={board.poweredOff}
+          title={t("schema.detail.power.hint")}
+          disabled={!control}
+          onClick={() => void setBoardPower({ path: { id: board.id }, body: { on: board.poweredOff }, throwOnError: true }).catch(failed)}
+        >
+          <Power />
+          {t(board.poweredOff ? "schema.detail.power.on" : "schema.detail.power.off")}
+        </Button>
+        {element.kind === "board" && (
           <Button variant="outline" size="sm" disabled={!control} onClick={() => void clearBoard({ path: { id: board.id }, throwOnError: true }).catch(failed)}>
             <Eraser />
             {t("board.clear")}
           </Button>
-        </div>
-      )}
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** Ovladanie linky: predstierany vypadok (spojenie s INISSom sa zavrie a nove sa neprijima). */
+function LineControls({ line, control }: { line: LineDto; control: boolean }) {
+  const outage = line.status === "outage";
+  return (
+    <section className="flex flex-col gap-2 rounded-md border p-3" aria-label={t("schema.detail.controls")}>
+      <h3 className="text-xs font-medium text-muted-foreground">{t("schema.detail.controls")}</h3>
+      <div>
+        <Button
+          variant={outage ? "secondary" : "outline"}
+          size="sm"
+          aria-pressed={outage}
+          title={t("schema.detail.outage.hint")}
+          disabled={!control}
+          onClick={() => void setLineOutage({ path: { number: line.number }, body: { outage: !outage }, throwOnError: true }).catch(failed)}
+        >
+          <Unplug />
+          {t(outage ? "schema.detail.outage.off" : "schema.detail.outage.on")}
+        </Button>
+      </div>
     </section>
   );
 }
@@ -112,6 +146,7 @@ export function SchemaDetail({ element, live, control, onClose }: Props) {
             {element.circuit && <Row label={t("schema.detail.circuit")}>{element.circuit}</Row>}
           </dl>
           {board && element.kind !== "commLine" && <Controls element={element} board={board} control={control} />}
+          {line && element.kind === "commLine" && <LineControls line={line} control={control} />}
           {board && element.kind !== "commLine" && <BoardView board={board} />}
           {page && (
             <div>

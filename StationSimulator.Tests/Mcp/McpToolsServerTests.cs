@@ -342,6 +342,17 @@ public sealed class McpToolsServerTests
 
         // scenar: vypadok napajania tabule
         object[] steps = [new { atMs = 0, durationMs = 60000, line = 8, address = 129, action = "powerLoss", fault = (object?)null }];
+        // schema stanice: nova, nahradena (obrazok a jeho umiestnenie ostavaju) a zmazana
+        var elements = new[] { new Dictionary<string, object?> { ["id"] = 1, ["kind"] = "board", ["width"] = 120, ["height"] = 24, ["line"] = 8, ["address"] = 129 } };
+        var plan = await mcp.Call("save_schema", new() { ["name"] = "Hala", ["width"] = 800, ["height"] = 400, ["elements"] = elements });
+        var planId = plan.GetProperty("id").GetInt32();
+        Assert.AreEqual(("Hala", 1), (plan.GetProperty("name").GetString(), plan.GetProperty("elements").GetArrayLength()));
+        var replaced = await mcp.Call("save_schema", new() { ["id"] = planId, ["name"] = "Hala 2", ["width"] = 900, ["height"] = 400, ["elements"] = Array.Empty<object>() });
+        Assert.AreEqual(("Hala 2", 900, 0), (replaced.GetProperty("name").GetString(), replaced.GetProperty("width").GetInt32(), replaced.GetProperty("elements").GetArrayLength()));
+        StringAssert.Contains(await mcp.Error("save_schema", new() { ["name"] = " ", ["width"] = 800, ["height"] = 400, ["elements"] = Array.Empty<object>() }), "schema.name");
+        StringAssert.Contains((await mcp.Call("delete_schema", new() { ["id"] = planId })).GetProperty("done").GetString(), "deleted");
+        StringAssert.Contains(await mcp.Error("delete_schema", new() { ["id"] = planId }), "schema.notFound");
+
         var scenario = await mcp.Call("save_scenario", new() { ["name"] = "Vypadok tabule", ["steps"] = steps });
         var id = scenario.GetProperty("id").GetInt32();
         var saved = await mcp.Call("save_scenario", new() { ["id"] = id, ["name"] = "Vypadok 2", ["steps"] = steps });

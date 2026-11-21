@@ -194,4 +194,38 @@ public sealed class FaultScenarioTests
         Assert.IsFalse(sim.Read(s => s.FindLine(1))!.Outage);
         Assert.IsFalse(await runner.StopAsync(1));
     }
+
+    [TestMethod]
+    public async Task RucnyVypadok_PlatiPopriScenariAVypneHoObsluha()
+    {
+        var time = new ManualTime();
+        var sim = Station(time);
+        await using var transport = new TransportManager(sim);
+        using var runner = new ScenarioRunner(sim, transport, new TestLive(), time);
+        bool Off(string id) => sim.Read(s => s.Boards.Single(b => b.Id == id).PoweredOff);
+        LineStatus Line() => sim.Read(s => s.FindLine(1))!.Status;
+
+        await runner.SetManualPowerAsync("1-5", true);
+        await runner.SetManualOutageAsync(1, true);
+        Assert.IsTrue(Off("1-5"));
+        Assert.AreEqual(LineStatus.Outage, Line());
+
+        // scenar s tym istym vypadkom napajania: po jeho konci ostava rucny vypadok
+        await runner.StartAsync(1, Scenario(false, new ScenarioStep(0, 1000, 1, 5, ScenarioAction.PowerLoss), new ScenarioStep(0, 1000, 1, 6, ScenarioAction.PowerLoss)));
+        Assert.IsTrue(Off("1-6"));
+        time.Advance(TimeSpan.FromSeconds(2));
+        await runner.TickAsync();
+        Assert.IsTrue(Off("1-5"));
+        Assert.IsFalse(Off("1-6"));
+
+        await runner.SetManualPowerAsync("1-5", false);
+        await runner.SetManualOutageAsync(1, false);
+        Assert.IsFalse(Off("1-5"));
+        Assert.AreNotEqual(LineStatus.Outage, Line());
+
+        // ukoncenie servera rucne vypadky zrusi - neukladaju sa
+        await runner.SetManualPowerAsync("1-6", true);
+        await runner.StopAllAsync();
+        Assert.IsFalse(Off("1-6"));
+    }
 }
