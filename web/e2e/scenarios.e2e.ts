@@ -1,7 +1,7 @@
 // Scenar porucha: novy scenar s krokom na tabuli, spustenie (tabula neodpoveda, karta scenara bezi), zastavenie
 // (tabula ma spat povodnu poruchu) a odstranenie.
 import { expect, test } from "@playwright/test";
-import { API_HEADERS, collectErrors, createLine, deleteLine, elenRow, openPage, sendToLine } from "./helpers";
+import { API_HEADERS, collectErrors, createLine, deleteLine, elenRow, openLine, openPage } from "./helpers";
 
 const LINE = 65;
 
@@ -9,7 +9,9 @@ test("scenar porucha v case", async ({ page }) => {
   const errors = collectErrors(page);
   await page.goto("/#/");
   await createLine(page, LINE, "E2E scenár");
-  await sendToLine(47000 + LINE, [elenRow(5, 1, "SCENAR")]);
+  // spojenie ostava otvorene - odpojenie by vyvolalo upozornenie na vypadok, ktore prekryje tlacidla stranky
+  const iniss = await openLine(47000 + LINE);
+  await iniss.ask(elenRow(5, 1, "SCENAR"));
   const fault = async () => {
     const state = (await (await page.request.get("/api/state")).json()) as { boards: { id: string; fault: { kind: string } }[] };
     return state.boards.find((b) => b.id === `${LINE}-5`)?.fault.kind;
@@ -42,6 +44,7 @@ test("scenar porucha v case", async ({ page }) => {
   await page.getByRole("alertdialog").getByRole("button", { name: "Odstrániť" }).click();
   await expect(card).toBeHidden();
 
+  iniss.close();
   await deleteLine(page, LINE);
   expect(errors).toEqual([]);
   // nic nezostalo

@@ -9,7 +9,7 @@ public sealed class FaultScenarioRequestValidator : AbstractValidator<FaultScena
 {
     public FaultScenarioRequestValidator()
     {
-        RuleFor(r => r.Name).Must(n => !string.IsNullOrWhiteSpace(n)).MaximumLength(100).WithErrorCode(ScenarioErrors.Name);
+        RuleFor(r => r.Name).Must(n => !string.IsNullOrWhiteSpace(n)).WithErrorCode(ScenarioErrors.Name).MaximumLength(100).WithErrorCode(ScenarioErrors.Name);
         RuleFor(r => r.CycleMs).InclusiveBetween(1000, ScenarioErrors.MaxMs).When(r => r.CycleMs is not null).WithErrorCode(ScenarioErrors.Cycle);
         RuleFor(r => r.Steps).NotNull().Must(s => s.Count <= ScenarioErrors.MaxSteps).WithErrorCode(ScenarioErrors.Steps);
         RuleForEach(r => r.Steps).NotNull().WithErrorCode(ScenarioErrors.Steps).ChildRules(step =>
