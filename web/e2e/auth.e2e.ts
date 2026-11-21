@@ -44,8 +44,8 @@ test("vlastna rola: menu len so strankami, na ktore ma pouzivatel opravnenie", a
   await page.getByLabel("Heslo", { exact: true }).fill("heslo-panely-1");
   await page.getByRole("button", { name: "Prihlásiť" }).click();
   await expect(page.getByRole("link", { name: "Zariadenia", exact: true })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Správy", exact: true })).toBeVisible();
-  for (const hidden of ["Štatistiky", "Archív tabúľ", "Používatelia", "Roly", "Audit", "Nastavenia"])
+  await expect(page.getByRole("link", { name: "Informačné panely", exact: true })).toBeVisible();
+  for (const hidden of ["Komunikácia", "Archív", "Prístup", "Audit", "Nastavenia"])
     await expect(page.getByRole("link", { name: hidden, exact: true })).toBeHidden();
   await expect(page.getByRole("button", { name: /Panely/ })).toBeVisible();
 

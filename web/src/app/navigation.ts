@@ -1,29 +1,21 @@
-// Hlavne menu: skupiny a stranky s ikonou a opravnenim (ram podla neho stranku ukaze alebo odmietne).
+// Hlavne menu: skupiny a polozky s ikonou. Polozka ma jednu alebo viac stranok - viac stranok su karty v zahlavi
+// (napr. Archiv: Tabule, Hlasenia, Monitor). Kazda stranka ma vlastnu adresu a opravnenie; ram podla neho stranku
+// ukaze alebo odmietne a polozku menu ukaze, ked pouzivatel smie aspon jednu jej stranku.
 import {
   Activity,
   Archive,
   Cable,
-  ChartColumn,
   Disc3,
-  Frame,
-  GitCompareArrows,
-  Group,
   History,
-  KeyRound,
   LayoutGrid,
   Lightbulb,
   Map as MapIcon,
-  ListVideo,
-  ShieldUser,
-  Megaphone,
-  MessageSquareText,
   Monitor,
   MonitorPlay,
   Palette,
-  RadioTower,
   Settings,
+  ShieldUser,
   Siren,
-  Users,
   type LucideIcon,
 } from "lucide-react";
 import { PERMISSIONS, type Permission } from "@/api";
@@ -56,12 +48,22 @@ export type NavPath =
   | "/audit"
   | "/settings";
 
-export interface NavItem {
+/** Opravnenie stranky; pri zozname staci jedno z nich. */
+type Access = Permission | readonly Permission[];
+
+/** Stranka polozky menu: adresa, nazov karty a opravnenie. */
+export interface NavPage {
   to: NavPath;
+  /** Nazov karty v zahlavi (pri polozke s jedinou strankou sa nepouzije). */
+  label: TextKey;
+  permission: Access;
+}
+
+export interface NavItem {
   label: TextKey;
   icon: LucideIcon;
-  /** Opravnenie stranky; pri zozname staci jedno z nich. */
-  permission: Permission | readonly Permission[];
+  /** Stranky polozky v poradi kariet; prva dostupna sa otvori z menu. */
+  pages: NavPage[];
 }
 
 export interface NavGroup {
@@ -69,55 +71,97 @@ export interface NavGroup {
   items: NavItem[];
 }
 
+const single = (to: NavPath, label: TextKey, icon: LucideIcon, permission: Access): NavItem => ({ label, icon, pages: [{ to, label, permission }] });
+
 export const NAV: NavGroup[] = [
   {
     label: "nav.group.simulation",
     items: [
-      { to: "/devices", label: "nav.boards", icon: LayoutGrid, permission: PERMISSIONS.view },
-      { to: "/schema", label: "nav.schema", icon: MapIcon, permission: PERMISSIONS.view },
-      { to: "/designs", label: "nav.designs", icon: Palette, permission: PERMISSIONS.designs },
-      { to: "/faces", label: "nav.faces", icon: Frame, permission: PERMISSIONS.designs },
-      { to: "/lines", label: "nav.lines", icon: Cable, permission: PERMISSIONS.view },
-      { to: "/lights", label: "nav.lights", icon: Lightbulb, permission: PERMISSIONS.view },
-      { to: "/scenarios", label: "nav.scenarios", icon: Siren, permission: PERMISSIONS.view },
-      { to: "/log", label: "nav.log", icon: Activity, permission: PERMISSIONS.log },
-      { to: "/statistics", label: "nav.statistics", icon: ChartColumn, permission: PERMISSIONS.statistics },
-      { to: "/recordings", label: "nav.recordings", icon: Disc3, permission: PERMISSIONS.view },
-      { to: "/recordings/compare", label: "nav.compare", icon: GitCompareArrows, permission: PERMISSIONS.view },
+      single("/devices", "nav.boards", LayoutGrid, PERMISSIONS.view),
+      single("/schema", "nav.schema", MapIcon, PERMISSIONS.view),
+      single("/lines", "nav.lines", Cable, PERMISSIONS.view),
+      single("/lights", "nav.lights", Lightbulb, PERMISSIONS.view),
+      single("/scenarios", "nav.scenarios", Siren, PERMISSIONS.view),
+      {
+        label: "nav.appearance",
+        icon: Palette,
+        pages: [
+          { to: "/designs", label: "nav.designs", permission: PERMISSIONS.designs },
+          { to: "/faces", label: "nav.tab.faces", permission: PERMISSIONS.designs },
+        ],
+      },
+      {
+        label: "nav.log",
+        icon: Activity,
+        pages: [
+          { to: "/log", label: "nav.tab.log", permission: PERMISSIONS.log },
+          { to: "/statistics", label: "nav.statistics", permission: PERMISSIONS.statistics },
+        ],
+      },
+      {
+        label: "nav.recordings",
+        icon: Disc3,
+        pages: [
+          { to: "/recordings", label: "nav.recordings", permission: PERMISSIONS.view },
+          { to: "/recordings/compare", label: "nav.tab.compare", permission: PERMISSIONS.view },
+        ],
+      },
     ],
   },
   {
     label: "nav.group.inissview",
     items: [
-      { to: "/virtual", label: "nav.virtual", icon: MonitorPlay, permission: PERMISSIONS.view },
-      { to: "/archive/tables", label: "nav.archiveTables", icon: Archive, permission: PERMISSIONS.archive },
-      { to: "/archive/reports", label: "nav.archiveReports", icon: Megaphone, permission: PERMISSIONS.archive },
-      { to: "/archive/reports/live", label: "nav.reportMonitor", icon: RadioTower, permission: PERMISSIONS.archive },
-    ],
-  },
-  {
-    label: "nav.group.signage",
-    items: [
-      { to: "/signage/panels", label: "nav.signagePanels", icon: Monitor, permission: PERMISSIONS.view },
-      { to: "/signage/groups", label: "nav.signageGroups", icon: Group, permission: PERMISSIONS.view },
-      { to: "/signage/playlists", label: "nav.signagePlaylists", icon: ListVideo, permission: PERMISSIONS.view },
-      { to: "/signage/messages", label: "nav.signageMessages", icon: MessageSquareText, permission: PERMISSIONS.view },
+      single("/virtual", "nav.virtual", MonitorPlay, PERMISSIONS.view),
+      {
+        label: "nav.archive",
+        icon: Archive,
+        pages: [
+          { to: "/archive/tables", label: "nav.tab.archiveTables", permission: PERMISSIONS.archive },
+          { to: "/archive/reports", label: "nav.tab.archiveReports", permission: PERMISSIONS.archive },
+          { to: "/archive/reports/live", label: "nav.tab.reportMonitor", permission: PERMISSIONS.archive },
+        ],
+      },
+      {
+        label: "nav.group.signage",
+        icon: Monitor,
+        pages: [
+          { to: "/signage/panels", label: "nav.signagePanels", permission: PERMISSIONS.view },
+          { to: "/signage/groups", label: "nav.tab.signageGroups", permission: PERMISSIONS.view },
+          { to: "/signage/playlists", label: "nav.signagePlaylists", permission: PERMISSIONS.view },
+          { to: "/signage/messages", label: "nav.signageMessages", permission: PERMISSIONS.view },
+        ],
+      },
     ],
   },
   {
     label: "nav.group.admin",
     items: [
-      { to: "/users", label: "nav.users", icon: Users, permission: PERMISSIONS.users },
-      { to: "/roles", label: "nav.roles", icon: ShieldUser, permission: PERMISSIONS.users },
-      { to: "/keys", label: "nav.keys", icon: KeyRound, permission: PERMISSIONS.keys },
-      { to: "/audit", label: "nav.audit", icon: History, permission: PERMISSIONS.audit },
-      { to: "/settings", label: "nav.settings", icon: Settings, permission: [PERMISSIONS.settings, PERMISSIONS.server] },
+      {
+        label: "nav.access",
+        icon: ShieldUser,
+        pages: [
+          { to: "/users", label: "nav.users", permission: PERMISSIONS.users },
+          { to: "/roles", label: "nav.roles", permission: PERMISSIONS.users },
+          { to: "/keys", label: "nav.tab.keys", permission: PERMISSIONS.keys },
+        ],
+      },
+      single("/audit", "nav.audit", History, PERMISSIONS.audit),
+      single("/settings", "nav.settings", Settings, [PERMISSIONS.settings, PERMISSIONS.server]),
     ],
   },
 ];
 
-/** Polozka menu stranky na adrese; undefined = adresa mimo menu. */
-export function navItem(pathname: string): NavItem | undefined {
-  for (const group of NAV) for (const item of group.items) if (item.to === pathname) return item;
+/** Stranky polozky, ktore pouzivatel smie otvorit (allowed = ma opravnenie stranky). */
+export function allowedPages(item: NavItem, allowed: (permission: Access) => boolean): NavPage[] {
+  return item.pages.filter((page) => allowed(page.permission));
+}
+
+/** Polozka menu a jej stranka na adrese; undefined = adresa mimo menu. */
+export function navPage(pathname: string): { item: NavItem; page: NavPage } | undefined {
+  for (const group of NAV)
+    for (const item of group.items) {
+      const page = item.pages.find((p) => p.to === pathname);
+      if (page) return { item, page };
+    }
   return undefined;
 }

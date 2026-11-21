@@ -176,8 +176,31 @@ export function collectErrors(page: Page): string[] {
   return errors;
 }
 
-/** Vybrana polozka bocneho menu (odkaz s textom). */
+/** Stranky, ktore su kartou polozky menu: nazov stranky -> polozka menu a karta v zahlavi. */
+const TABS: Record<string, [menu: string, tab: string]> = {
+  Vzhľady: ["Vzhľad tabúľ", "Vzhľady"],
+  "Čelá tabúľ": ["Vzhľad tabúľ", "Čelá"],
+  Štatistiky: ["Komunikácia", "Štatistiky"],
+  "Porovnanie záznamov": ["Záznamy", "Porovnanie"],
+  "Archív tabúľ": ["Archív", "Tabule"],
+  "Archív hlásení": ["Archív", "Hlásenia"],
+  "Monitor hlásení": ["Archív", "Monitor"],
+  Panely: ["Informačné panely", "Panely"],
+  "Skupiny panelov": ["Informačné panely", "Skupiny"],
+  Playlisty: ["Informačné panely", "Playlisty"],
+  Správy: ["Informačné panely", "Správy"],
+  Používatelia: ["Prístup", "Používatelia"],
+  Roly: ["Prístup", "Roly"],
+  "Prístupové kľúče": ["Prístup", "Kľúče"],
+};
+
+/** Otvori stranku: polozku bocneho menu a pri stranke, ktora je jej kartou, aj kartu v zahlavi. */
 export async function openPage(page: Page, label: string) {
-  await page.getByRole("link", { name: label, exact: true }).first().click();
-  await expect(page.locator("header h1")).toHaveText(label);
+  const [menu, tab] = TABS[label] ?? [label, null];
+  await page.locator("[data-slot=sidebar-content]").getByRole("link", { name: menu, exact: true }).first().click();
+  await expect(page.locator("header h1")).toHaveText(menu);
+  if (!tab) return;
+  const link = page.locator("header nav").getByRole("link", { name: tab, exact: true });
+  await link.click();
+  await expect(link).toHaveAttribute("aria-current", "page");
 }

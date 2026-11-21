@@ -1,5 +1,5 @@
-// Bocny panel: nazov aplikacie, skupiny menu (len stranky, na ktore ma pouzivatel opravnenie; pri Linkach pocet
-// vypadkov) a ponuka pouzivatela.
+// Bocny panel: nazov aplikacie, skupiny menu (len polozky, z ktorych pouzivatel smie aspon jednu stranku; pri Linkach
+// pocet vypadkov) a ponuka pouzivatela. Polozka s viacerymi strankami otvori prvu dostupnu, ostatne su karty v zahlavi.
 import { Link, useRouterState } from "@tanstack/react-router";
 import { can, useSimulatorState, type MeDto } from "@/api";
 import {
@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { isOutage } from "@/features/lines/line-status";
 import { t } from "@/i18n";
-import { NAV } from "./navigation";
+import { allowedPages, NAV } from "./navigation";
 import { UserMenu } from "./UserMenu";
 
 export function AppSidebar({ me }: { me: MeDto }) {
@@ -47,19 +47,26 @@ export function AppSidebar({ me }: { me: MeDto }) {
       </SidebarHeader>
       <SidebarContent>
         {NAV.map((group) => {
-          const items = group.items.filter((item) => can(me, item.permission));
+          const items = group.items.flatMap((item) => {
+            const pages = allowedPages(item, (permission) => can(me, permission));
+            return pages.length ? [{ item, pages }] : [];
+          });
           if (items.length === 0) return null;
           return (
             <SidebarGroup key={group.label}>
               <SidebarGroupLabel>{t(group.label)}</SidebarGroupLabel>
               <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.to}>
-                    <SidebarMenuButton isActive={pathname === item.to} tooltip={t(item.label)} render={<Link to={item.to} onClick={navigated} />}>
+                {items.map(({ item, pages }) => (
+                  <SidebarMenuItem key={item.label}>
+                    <SidebarMenuButton
+                      isActive={item.pages.some((page) => page.to === pathname)}
+                      tooltip={t(item.label)}
+                      render={<Link to={pages[0].to} onClick={navigated} />}
+                    >
                       <item.icon />
                       <span>{t(item.label)}</span>
                     </SidebarMenuButton>
-                    {item.to === "/lines" && outages > 0 && (
+                    {pages[0].to === "/lines" && outages > 0 && (
                       <SidebarMenuBadge
                         className="bg-red-600 text-white peer-hover/menu-button:text-white peer-data-active/menu-button:text-white"
                         title={t("alert.badge")}
