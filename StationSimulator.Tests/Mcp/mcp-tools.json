@@ -15656,6 +15656,1226 @@
       }
     },
     {
+      "name": "set_board_power",
+      "title": "Board power",
+      "description": "Simulates a power loss of a board or device (on = false) or ends it (on = true). Without power the device does not answer and a board is empty after the power returns, until INISS sends its content again. The power loss is not saved; a device switched off by a running fault scenario stays off while the scenario lasts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "Board id \"line-address\", e.g. \"1-12\".",
+            "type": "string"
+          },
+          "on": {
+            "description": "true = powered, false = simulated power loss.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "on"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "line": {
+            "type": "integer"
+          },
+          "address": {
+            "type": "integer"
+          },
+          "secondAddress": {
+            "description": "Second address of a two-sided board; null = only one.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "manufacturer": {
+            "type": "string"
+          },
+          "family": {
+            "description": "elen, chars, flaps, amplifier, aksignal, remoteaudio or unknown.",
+            "type": "string"
+          },
+          "design": {
+            "description": "Design set for the board; null = default for the manufacturer.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "designInUse": {
+            "description": "Design actually used: the board's design, or the default design of the manufacturer when none is set or it does not exist.",
+            "type": "string"
+          },
+          "autoCreated": {
+            "description": "Created automatically by the first message to an unknown address.",
+            "type": "boolean"
+          },
+          "poweredOff": {
+            "description": "Simulated power outage: the board is dark and does not answer.",
+            "type": "boolean"
+          },
+          "fault": {
+            "description": "Simulated fault: kind, reply delay [ms] for delay, status bits for status.",
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "noReply",
+                  "nak",
+                  "delay",
+                  "garbage",
+                  "status"
+                ]
+              },
+              "delayMs": {
+                "type": "integer",
+                "default": 0
+              },
+              "status": {
+                "type": "integer",
+                "default": 0
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "mismatch": {
+            "description": "INISS sends messages meant for another manufacturer; null = fine.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "evidence": {
+                "type": "string"
+              },
+              "suggested": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "evidence",
+              "suggested"
+            ]
+          },
+          "stats": {
+            "description": "Message counters: frames from INISS, acknowledged (acks), rejected (naks), unanswered.",
+            "type": "object",
+            "properties": {
+              "frames": {
+                "type": "integer"
+              },
+              "acks": {
+                "type": "integer"
+              },
+              "naks": {
+                "type": "integer"
+              },
+              "unanswered": {
+                "type": "integer"
+              },
+              "lastFrameAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              }
+            },
+            "required": [
+              "frames",
+              "acks",
+              "naks",
+              "unanswered",
+              "lastFrameAt"
+            ]
+          },
+          "brightness": {
+            "description": "Brightness set by INISS [%].",
+            "type": "integer"
+          },
+          "clock": {
+            "description": "Clock time set by INISS; null = not set.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "description": "Increases with every change of the content or settings; pass it to wait_for_board_change.",
+            "type": "integer"
+          },
+          "rows": {
+            "description": "What the board shows, rows from the top; an empty row is \"\", alternating texts are {a|b}, the moving text of an elen board is the last row \"» text\", split-flap modules are joined with \" | \", an amplifier is \"ON 1\", \"ON 2\" or \"OFF\".",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile": {
+            "description": "Board settings (size, fonts, timing); only with raw = true.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "width": {
+                "type": "integer"
+              },
+              "rows": {
+                "type": "integer"
+              },
+              "rowHeight": {
+                "type": "integer"
+              },
+              "fontFile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fontMap": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": {
+                  "type": "integer"
+                }
+              },
+              "charFonts": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "font": {
+                      "type": "string",
+                      "default": ""
+                    },
+                    "bold": {
+                      "type": "boolean",
+                      "default": false
+                    }
+                  }
+                }
+              },
+              "alternationMs": {
+                "type": "integer"
+              },
+              "blinkOnMs": {
+                "type": "integer"
+              },
+              "blinkOffMs": {
+                "type": "integer"
+              },
+              "scrollSpeed": {
+                "type": "integer"
+              },
+              "monochrome": {
+                "type": "boolean"
+              },
+              "swapRedGreen": {
+                "type": "boolean"
+              },
+              "header": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "height": {
+                    "type": "integer"
+                  },
+                  "texts": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "x": {
+                          "type": "integer"
+                        },
+                        "y": {
+                          "type": "integer"
+                        },
+                        "height": {
+                          "type": "integer"
+                        },
+                        "text": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "x",
+                        "y",
+                        "height",
+                        "text"
+                      ]
+                    }
+                  },
+                  "clock": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "x": {
+                        "type": "integer"
+                      },
+                      "y": {
+                        "type": "integer"
+                      },
+                      "height": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "x",
+                      "y",
+                      "height"
+                    ]
+                  }
+                }
+              },
+              "face": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "faceValues": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "additionalProperties": {
+                  "type": "string"
+                }
+              },
+              "movingFont": {
+                "type": "integer"
+              },
+              "autoSize": {
+                "type": "boolean"
+              },
+              "rotationMs": {
+                "type": "integer"
+              },
+              "flaps": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "linesPerRecord": {
+                    "type": "integer"
+                  },
+                  "modules": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "line": {
+                          "type": "integer"
+                        },
+                        "position": {
+                          "type": "integer"
+                        },
+                        "span": {
+                          "type": "integer"
+                        },
+                        "list": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "line",
+                        "position",
+                        "span",
+                        "list"
+                      ]
+                    }
+                  },
+                  "lists": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "colors": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "$ref": "#/properties/profile/properties/flaps/properties/lists/additionalProperties"
+                    }
+                  }
+                }
+              },
+              "akSignal": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "lights": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "station": {
+                          "type": "integer"
+                        },
+                        "beforeArrival": {
+                          "type": "integer"
+                        },
+                        "beforeDeparture": {
+                          "type": "integer"
+                        },
+                        "afterDeparture": {
+                          "type": "integer"
+                        },
+                        "afterArrival": {
+                          "type": "integer"
+                        },
+                        "minOff": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "station"
+                      ]
+                    }
+                  },
+                  "audio": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "station": {
+                          "type": "integer"
+                        },
+                        "channel": {
+                          "type": "integer",
+                          "default": 1
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "station"
+                      ]
+                    }
+                  },
+                  "sensor": {
+                    "type": "object",
+                    "properties": {
+                      "mode": {
+                        "type": "string",
+                        "enum": [
+                          "sun",
+                          "dark",
+                          "light"
+                        ],
+                        "default": "sun"
+                      },
+                      "offsetMinutes": {
+                        "type": "integer",
+                        "default": 0
+                      }
+                    }
+                  },
+                  "conditions": {
+                    "type": "object",
+                    "properties": {
+                      "lightsFault": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highPriority": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "outputPowerError": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "ampSupplyMissing": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "ampCommError": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "bankNotSynced": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    }
+                  },
+                  "soundSeconds": {
+                    "type": "number"
+                  },
+                  "syncSeconds": {
+                    "type": "integer"
+                  },
+                  "silenceSeconds": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          },
+          "display": {
+            "description": "Raw content with fonts, character codes and positions; only with raw = true.",
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "family": {
+                "type": "string"
+              },
+              "brightness": {
+                "type": "integer"
+              },
+              "clock": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "clockSetAt": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "rows": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "integer"
+                    },
+                    "elements": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "run": {
+                            "type": [
+                              "object",
+                              "null"
+                            ],
+                            "properties": {
+                              "x": {
+                                "type": [
+                                  "integer",
+                                  "null"
+                                ]
+                              },
+                              "font": {
+                                "type": "integer"
+                              },
+                              "codes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "integer"
+                                }
+                              },
+                              "text": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "x",
+                              "font",
+                              "codes",
+                              "text"
+                            ]
+                          },
+                          "parts": {
+                            "type": [
+                              "array",
+                              "null"
+                            ],
+                            "items": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": [
+                                      "integer",
+                                      "null"
+                                    ]
+                                  },
+                                  "font": {
+                                    "type": "integer"
+                                  },
+                                  "codes": {
+                                    "$ref": "#/properties/display/properties/rows/items/properties/elements/items/properties/run/properties/codes",
+                                    "items": {}
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "font",
+                                  "codes",
+                                  "text"
+                                ]
+                              }
+                            }
+                          }
+                        },
+                        "required": [
+                          "type",
+                          "run",
+                          "parts"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "row",
+                    "elements"
+                  ]
+                }
+              },
+              "movingRow": {
+                "type": "integer"
+              },
+              "movingCodes": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "integer"
+                }
+              },
+              "movingText": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "brightnessGreen": {
+                "type": "integer"
+              },
+              "flashOnMs": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "flashOffMs": {
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "charRows": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "integer"
+                    },
+                    "layers": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "layer": {
+                            "type": "integer"
+                          },
+                          "codes": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          },
+                          "fonts": {
+                            "type": "array",
+                            "items": {
+                              "type": "integer"
+                            }
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "layer",
+                          "codes",
+                          "fonts",
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "row",
+                    "layers"
+                  ]
+                }
+              },
+              "flapRows": {
+                "type": [
+                  "array",
+                  "null"
+                ],
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "row": {
+                      "type": "integer"
+                    },
+                    "codes": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "row",
+                    "codes"
+                  ]
+                }
+              },
+              "rotatingUntil": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "format": "date-time"
+              },
+              "amplifier": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "band": {
+                    "type": "integer"
+                  },
+                  "state": {
+                    "type": "integer"
+                  },
+                  "onSince": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "switches": {
+                    "type": "integer"
+                  },
+                  "lastCommand": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "band",
+                  "state",
+                  "onSince",
+                  "switches",
+                  "lastCommand"
+                ]
+              },
+              "akSignal": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "autoMode": {
+                    "type": "boolean"
+                  },
+                  "manual": {
+                    "type": "boolean"
+                  },
+                  "dark": {
+                    "type": "boolean"
+                  },
+                  "lightOn": {
+                    "type": "boolean"
+                  },
+                  "lightState": {
+                    "type": "string"
+                  },
+                  "audioState": {
+                    "type": "string"
+                  },
+                  "announcements": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer"
+                        },
+                        "channel": {
+                          "type": "integer"
+                        },
+                        "sounds": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "startedAt": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "result": {
+                          "type": "string",
+                          "enum": [
+                            "playing",
+                            "completed",
+                            "stopped",
+                            "cancelled"
+                          ]
+                        },
+                        "pauses": {
+                          "type": [
+                            "array",
+                            "null"
+                          ],
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "beforeMs": {
+                                "type": "integer"
+                              },
+                              "afterMs": {
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "beforeMs",
+                              "afterMs"
+                            ]
+                          }
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "durationMs": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "value": {
+                          "type": [
+                            "integer",
+                            "null"
+                          ]
+                        },
+                        "endedAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        },
+                        "queue": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "circuit": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "channel",
+                        "sounds",
+                        "startedAt",
+                        "result"
+                      ]
+                    }
+                  },
+                  "darkSince": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "darkChangesAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "lightChangedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "lightQueryAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "audioQueryAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "serverSilent": {
+                    "type": "boolean"
+                  },
+                  "banks": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "syncedAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "syncUntil": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "conditions": {
+                    "type": "object",
+                    "properties": {
+                      "lightsFault": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "highPriority": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "outputPowerError": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "ampSupplyMissing": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "ampCommError": {
+                        "type": "boolean",
+                        "default": false
+                      },
+                      "bankNotSynced": {
+                        "type": "boolean",
+                        "default": false
+                      }
+                    }
+                  },
+                  "scenario": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "conditions": {
+                        "type": "object",
+                        "properties": {
+                          "lightsFault": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "highPriority": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "outputPowerError": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "ampSupplyMissing": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "ampCommError": {
+                            "type": "boolean",
+                            "default": false
+                          },
+                          "bankNotSynced": {
+                            "type": "boolean",
+                            "default": false
+                          }
+                        }
+                      },
+                      "sensor": {
+                        "type": [
+                          "string",
+                          "null"
+                        ],
+                        "enum": [
+                          "sun",
+                          "dark",
+                          "light",
+                          null
+                        ]
+                      }
+                    },
+                    "required": [
+                      "conditions",
+                      "sensor"
+                    ]
+                  }
+                },
+                "required": [
+                  "autoMode",
+                  "manual",
+                  "dark",
+                  "lightOn",
+                  "lightState",
+                  "audioState",
+                  "announcements"
+                ]
+              },
+              "remoteAudio": {
+                "type": [
+                  "object",
+                  "null"
+                ],
+                "properties": {
+                  "queues": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        },
+                        "off": {
+                          "type": "boolean"
+                        },
+                        "playing": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "id": {
+                              "type": "integer"
+                            },
+                            "channel": {
+                              "type": "integer"
+                            },
+                            "sounds": {
+                              "$ref": "#/properties/display/properties/akSignal/properties/announcements/items/properties/sounds",
+                              "items": {}
+                            },
+                            "startedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "result": {
+                              "type": "string",
+                              "enum": [
+                                "playing",
+                                "completed",
+                                "stopped",
+                                "cancelled"
+                              ]
+                            },
+                            "pauses": {
+                              "$ref": "#/properties/display/properties/akSignal/properties/announcements/items/properties/pauses",
+                              "items": {}
+                            },
+                            "title": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "durationMs": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "value": {
+                              "type": [
+                                "integer",
+                                "null"
+                              ]
+                            },
+                            "endedAt": {
+                              "type": [
+                                "string",
+                                "null"
+                              ],
+                              "format": "date-time"
+                            },
+                            "queue": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "circuit": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "channel",
+                            "sounds",
+                            "startedAt",
+                            "result"
+                          ]
+                        },
+                        "lastCommandAt": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "format": "date-time"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "off",
+                        "playing"
+                      ]
+                    }
+                  },
+                  "announcements": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/properties/display/properties/akSignal/properties/announcements/items"
+                    }
+                  },
+                  "lastQueryAt": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "queues",
+                  "announcements"
+                ]
+              }
+            },
+            "required": [
+              "family",
+              "brightness",
+              "clock",
+              "clockSetAt",
+              "rows",
+              "movingRow",
+              "movingCodes",
+              "movingText"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "line",
+          "address",
+          "secondAddress",
+          "manufacturer",
+          "family",
+          "design",
+          "designInUse",
+          "autoCreated",
+          "poweredOff",
+          "fault",
+          "mismatch",
+          "stats",
+          "brightness",
+          "clock",
+          "version",
+          "rows",
+          "profile",
+          "display"
+        ]
+      },
+      "annotations": {
+        "title": "Board power",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
       "name": "set_line",
       "title": "Create or change line",
       "description": "Creates a line or changes an existing one; for an existing line only the given values change. A new line needs tableClass and endpoint. The line starts listening at once (a port used by another program makes its status error).",
@@ -15797,6 +17017,47 @@
       },
       "annotations": {
         "title": "Create or change line",
+        "destructiveHint": false,
+        "idempotentHint": true,
+        "openWorldHint": false,
+        "readOnlyHint": false
+      }
+    },
+    {
+      "name": "set_line_outage",
+      "title": "Line outage",
+      "description": "Simulates an outage of a line (outage = true) or ends it (outage = false): the connection with INISS is closed and a new one is not accepted. The outage is not saved; a line in an outage of a running fault scenario stays in it while the scenario lasts.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "description": "Line number.",
+            "type": "integer"
+          },
+          "outage": {
+            "description": "true = outage, false = the line runs.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "outage"
+        ]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "done": {
+            "description": "What was done.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "done"
+        ]
+      },
+      "annotations": {
+        "title": "Line outage",
         "destructiveHint": false,
         "idempotentHint": true,
         "openWorldHint": false,

@@ -185,7 +185,7 @@ ASP.NET Core cez `FrameworkReference`, nie Web SDK (`wwwroot` sa kopíruje do v�
   - zmeny cez existujúce príkazy (audit `key:<názov>`), `set_*` menia len zadané hodnoty (`McpRequests`),
     `McpRequests.Patch<T>` – null = predvolená hodnota, prázdne reťazce sú platné, polia sa nahrádzajú celé;
   - žiadny prázdny reťazec ako príznak v parametroch (model ho posiela ako neplatný JSON) – radšej `bool`;
-  - `send_frame` len na linke bez pripojeného INISSu, napájanie a výpadok linky len scenárom;
+  - `send_frame` len na linke bez pripojeného INISSu, ručný výpadok napájania a linky `set_board_power`/`set_line_outage` (neukladá sa, scenár má prednosť);
   - `set_board_look` mení profil JSON merge patchom a vracia `designInUse` a `viewUrl`.
 - MCP Apps (experimentálne MCPEXP003) – `show_board` a `show_virtual_board` s `[McpAppUi]`, jeden
   `wwwroot/mcp-app/app.html` z webu (`web/src/mcp-app`, `vite.mcp.config.ts` – všetko vložené). Rámec nesmie na

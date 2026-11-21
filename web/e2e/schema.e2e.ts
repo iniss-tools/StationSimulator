@@ -67,6 +67,17 @@ test("schema stanice: editor, zivy stav a kiosk", async ({ page }) => {
   await expect(layers.getByRole("button", { name: "Nástupište" })).toBeVisible();
   await page.getByLabel("Text").fill("Nástupište 1");
   await expect(page.getByText("Neuložené zmeny")).toBeVisible();
+  // otoceny prvok ma uchyty otocene s nim a da sa nimi zvacsit
+  await page.getByLabel("Otočenie").fill("90");
+  await expect(page.locator("[data-handle]")).toHaveCount(8);
+  const width = await page.getByLabel("Šírka").inputValue();
+  const grip = await page.locator('[data-handle="3"]').boundingBox();
+  await page.mouse.move(grip!.x + 4, grip!.y + 4);
+  await page.mouse.down();
+  await page.mouse.move(grip!.x + 4, grip!.y + 44, { steps: 4 });
+  await page.mouse.up();
+  await expect(page.getByLabel("Šírka")).not.toHaveValue(width);
+  await page.getByLabel("Otočenie").fill("0");
   // krok spat vrati text, znova ho zopakuje
   await page.getByRole("button", { name: "Späť (Ctrl+Z)" }).click();
   await page.getByRole("button", { name: "Znova (Ctrl+Y)" }).click();

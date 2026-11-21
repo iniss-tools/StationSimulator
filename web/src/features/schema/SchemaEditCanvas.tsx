@@ -3,7 +3,8 @@
 // uchyt v strede useku prida bod, dvojklik bod odstrani). Pri tahani sa prvok prichytava k okrajom a stredom ostatnych
 // prvkov a platna (ruzove vodiace ciary) alebo k mriezke, s Alt bez prichytenia a po desatinach. Drzany Alt bez
 // tahania meria vzdialenost vyberu od prvku pod mysou (inak od platna). Otoceny prvok sa vybera a prichytava podla
-// obdlznika okolo otocenej plochy, jeho uchyty su otocene s nim a menia rozmer v jeho osiach. V rezime uprav pozadia
+// obdlznika okolo otocenej plochy, jeho uchyty su otocene s nim a menia rozmer v jeho osiach (pri otoceni o stvrtiny
+// kruhu s prichytavanim ako neotoceny prvok, pri sikmom na mriezku alebo cely krok). V rezime uprav pozadia
 // sa namiesto prvkov taha a meni plocha obrazka pozadia.
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 import type { SchemaElementDto, StationSchemaDto } from "@/api";
@@ -26,10 +27,13 @@ import {
   movePoint,
   removePoint,
   resizeBox,
+  quarterTurns,
   resizeRotated,
   rotatePoint,
   rotationCenter,
   straighten,
+  turnBox,
+  turnHandle,
   type Handle,
 } from "./schema-edit";
 import type { SchemaEditorView } from "./view";
@@ -81,6 +85,8 @@ interface Drag {
   picture: boolean;
   /** Otocenie prvku, ktoreho uchyt sa taha (stupne). */
   rotation: number;
+  /** Uchyt patri textu (otaca sa okolo svojho zaciatku a meni velkost pisma). */
+  text: boolean;
   originals: Map<number, SchemaElementDto>;
   /** Plocha tahanych prvkov na zaciatku. */
   box: Box;
@@ -198,6 +204,7 @@ export function SchemaEditCanvas(props: Props) {
       point: null,
       picture: false,
       rotation: handle && !isPolyline(elements[index].kind) ? elements[index].rotation : 0,
+      text: elements[index].kind === "text",
       originals: new Map(moving.map((i) => [i, elements[i]])),
       // uchyt meni neotocenu plochu, posun sa prichytava podla plochy s otocenim
       box: handle ? boxOf(elements[index]) : union(moving.map((i) => boundsOf(elements[i]))),
@@ -231,6 +238,7 @@ export function SchemaEditCanvas(props: Props) {
       handle: null,
       picture: false,
       rotation: 0,
+      text: false,
       point: insert ? point + 1 : point,
       originals: new Map([[index, original]]),
       box: boxOf(original),
@@ -253,6 +261,7 @@ export function SchemaEditCanvas(props: Props) {
       point: null,
       picture: true,
       rotation: 0,
+      text: false,
       originals: new Map(),
       box: { x: background.x, y: background.y, w: background.width, h: background.height },
       targets: targetsWithout(new Set()),
@@ -326,10 +335,37 @@ export function SchemaEditCanvas(props: Props) {
       dy = guides.some((g) => g.axis === "y") || options.grid ? snapped.dy : snap(d.box.y + dy, step) - d.box.y;
       for (const [i, original] of d.originals) changes.set(i, moveBy(original, dx, dy, 0.001));
     } else if (d.rotation) {
-      // otoceny prvok: rozmer v jeho osiach, protilahly okraj ostava na mieste; bez prichytavania
-      const resized = resizeRotated(d.box, d.rotation, h, dx, dy);
-      const whole = { ...resized, w: snap(resized.w, step), h: snap(resized.h, step) };
-      for (const [i, original] of d.originals) changes.set(i, fitTo(original, d.box, whole, 0.001));
+      const turns = quarterTurns(d.rotation);
+      let resized: Box;
+      if (d.text) {
+        // otoceny text sa otaca okolo svojho zaciatku: meni sa vyska (velkost pisma), zaciatok ostava na mieste
+        const local = rotatePoint(dx, dy, 0, 0, -d.rotation);
+        const next = resizeBox(d.box, h, local.x, local.y);
+        resized = { x: d.box.x, y: d.box.y, w: next.w, h: snap(next.h, step) };
+      } else if (turns !== null) {
+        // otocenie o stvrtiny kruhu: okraje su rovnobezne s obrazovkou, prichytavaju sa ako pri neotocenom prvku
+        const screen = turnBox(d.box, turns);
+        const turned = turnHandle(h, turns);
+        if (turned.left || turned.right) dx = edge("x", turned.left ? screen.x : screen.x + screen.w, dx, screen);
+        if (turned.top || turned.bottom) dy = edge("y", turned.top ? screen.y : screen.y + screen.h, dy, screen);
+        resized = turnBox(resizeBox(screen, turned, dx, dy), turns);
+      } else {
+        // sikme otocenie: rozmer v osiach prvku, protilahly okraj ostava na mieste; rozmer ide na mriezku alebo cely krok
+        const free = resizeRotated(d.box, d.rotation, h, dx, dy);
+        const unit = options.grid ? options.grid.step : step;
+        const sized = { ...d.box, w: Math.max(unit, snap(free.w, unit)), h: Math.max(unit, snap(free.h, unit)) };
+        // posun, ktory da presne zaokruhleny rozmer - protilahly okraj tak ostane na mieste
+        const local = rotatePoint(dx, dy, 0, 0, -d.rotation);
+        const exact = rotatePoint(
+          h.left ? d.box.w - sized.w : h.right ? sized.w - d.box.w : local.x,
+          h.top ? d.box.h - sized.h : h.bottom ? sized.h - d.box.h : local.y,
+          0,
+          0,
+          d.rotation,
+        );
+        resized = resizeRotated(d.box, d.rotation, h, exact.x, exact.y);
+      }
+      for (const [i, original] of d.originals) changes.set(i, fitTo(original, d.box, resized, 0.001));
     } else {
       if (h.left || h.right) dx = edge("x", h.left ? d.box.x : d.box.x + d.box.w, dx, d.box);
       if (h.top || h.bottom) dy = edge("y", h.top ? d.box.y : d.box.y + d.box.h, dy, d.box);
@@ -364,14 +400,13 @@ export function SchemaEditCanvas(props: Props) {
   const only = selection.length === 1 && !elements[selection[0]]?.locked && bounds[selection[0]] ? elements[selection[0]] : null;
   // jedina vybrana lomena ciara ma uchyty v bodoch namiesto uchytov plochy
   const line = only && isPolyline(only.kind) ? only : null;
-  // uchyty plochy; otoceny text ich nema (velkost pisma sa meni vo vlastnostiach)
-  const resizable = only && !line && !(only.rotation && only.kind === "text") ? boxOf(only) : null;
-  /** Poloha uchytu aj s otocenim prvku okolo jeho stredu. */
-  const handleAt = (h: Handle, b: Box, rotation: number): CSSProperties => {
+  const resizable = only && !line ? boxOf(only) : null;
+  /** Poloha uchytu aj s otocenim prvku okolo jeho stredu otocenia (text okolo svojho zaciatku). */
+  const handleAt = (h: Handle, b: Box, element: SchemaElementDto): CSSProperties => {
     const style = handleStyle(h, b, scale);
-    if (!rotation) return style;
-    const center = { x: (b.x + b.w / 2) * scale, y: (b.y + b.h / 2) * scale };
-    const turned = rotatePoint(Number(style.left) + 4, Number(style.top) + 4, center.x, center.y, rotation);
+    if (!element.rotation) return style;
+    const pivot = rotationCenter(element);
+    const turned = rotatePoint(Number(style.left) + 4, Number(style.top) + 4, pivot.x * scale, pivot.y * scale, element.rotation);
     return { ...style, left: turned.x - 4, top: turned.y - 4, cursor: "crosshair" };
   };
   const picture: Box | null = backgroundEdit && background ? { x: background.x, y: background.y, w: background.width, h: background.height } : null;
@@ -487,7 +522,7 @@ export function SchemaEditCanvas(props: Props) {
             key={k}
             data-handle={k}
             className="absolute size-2 rounded-xs border border-primary bg-background"
-            style={handleAt(h, resizable, only?.rotation ?? 0)}
+            style={handleAt(h, resizable, only!)}
             onPointerDown={(e) => begin(e, selection[0], h)}
           />
         ))}

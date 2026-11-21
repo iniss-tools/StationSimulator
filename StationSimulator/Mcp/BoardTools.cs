@@ -122,6 +122,25 @@ public static class BoardTools
         return await Detail(board, texts, designs, id, false, cancellationToken);
     }
 
+    [McpServerTool(Name = "set_board_power", Title = "Board power", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
+    [Description("Simulates a power loss of a board or device (on = false) or ends it (on = true). Without power the device does not answer and "
+                 + "a board is empty after the power returns, until INISS sends its content again. The power loss is not saved; a device switched off "
+                 + "by a running fault scenario stays off while the scenario lasts.")]
+    [Authorize(Policy = Permissions.BoardsControl)]
+    public static async Task<BoardDetail> SetBoardPower(
+        IQueryHandler<GetBoardQuery, BoardDto> board,
+        IQueryHandler<GetDesignsQuery, DesignInfoDto[]> designs,
+        IQueryHandler<GetBoardTextsQuery, IReadOnlyList<BoardTextDto>> texts,
+        ICommandHandler<SetBoardPowerCommand> handler,
+        [Description(IdDescription)] string id,
+        [Description("true = powered, false = simulated power loss.")] bool on,
+        CancellationToken cancellationToken = default)
+    {
+        (await handler.Handle(new SetBoardPowerCommand(id, on), cancellationToken)).ThrowIfFailed();
+        return await Detail(board, texts, designs, id, false, cancellationToken);
+    }
+
     [McpServerTool(Name = "clear_board", Title = "Clear board", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("Clears what a board shows; INISS fills it again with its next messages.")]
     [Authorize(Policy = Permissions.BoardsControl)]

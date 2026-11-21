@@ -342,6 +342,16 @@ public sealed class McpToolsServerTests
 
         // scenar: vypadok napajania tabule
         object[] steps = [new { atMs = 0, durationMs = 60000, line = 8, address = 129, action = "powerLoss", fault = (object?)null }];
+        // rucny vypadok napajania tabule a linky a ich koniec
+        Assert.IsTrue((await mcp.Call("set_board_power", new() { ["id"] = "8-129", ["on"] = false })).GetProperty("poweredOff").GetBoolean());
+        Assert.IsFalse((await mcp.Call("set_board_power", new() { ["id"] = "8-129", ["on"] = true })).GetProperty("poweredOff").GetBoolean());
+        StringAssert.Contains(await mcp.Error("set_board_power", new() { ["id"] = "8-200", ["on"] = false }), "board.notFound");
+        StringAssert.Contains((await mcp.Call("set_line_outage", new() { ["number"] = 8, ["outage"] = true })).GetProperty("done").GetString(), "is on");
+        Assert.AreEqual("outage", (await mcp.Call("get_status")).GetProperty("lines").EnumerateArray().Single(l => l.GetProperty("number").GetInt32() == 8)
+            .GetProperty("status").GetString());
+        await mcp.Call("set_line_outage", new() { ["number"] = 8, ["outage"] = false });
+        StringAssert.Contains(await mcp.Error("set_line_outage", new() { ["number"] = 99, ["outage"] = true }), "line.notFound");
+
         // schema stanice: nova, nahradena (obrazok a jeho umiestnenie ostavaju) a zmazana
         var elements = new[] { new Dictionary<string, object?> { ["id"] = 1, ["kind"] = "board", ["width"] = 120, ["height"] = 24, ["line"] = 8, ["address"] = 129 } };
         var plan = await mcp.Call("save_schema", new() { ["name"] = "Hala", ["width"] = 800, ["height"] = 400, ["elements"] = elements });

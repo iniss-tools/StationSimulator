@@ -14,11 +14,14 @@ import {
   newDevice,
   newDrawing,
   nextId,
+  quarterTurns,
   removePoint,
   resizeBox,
   resizeRotated,
   rotatePoint,
   straighten,
+  turnBox,
+  turnHandle,
   unplacedDevices,
 } from "./schema-edit";
 
@@ -196,5 +199,31 @@ describe("zmena velkosti otoceneho prvku", () => {
 
   test("rozmer neklesne pod najmensi ani pri otoceni", () => {
     expect(resizeRotated(box, 45, { left: true }, 5000, 5000).w).toBe(4);
+  });
+});
+
+describe("prvok otoceny o stvrtiny kruhu", () => {
+  test("stvrtiny sa spoznaju aj pri zapornom a vacsom uhle", () => {
+    expect(quarterTurns(0)).toBe(0);
+    expect(quarterTurns(90)).toBe(1);
+    expect(quarterTurns(-90)).toBe(3);
+    expect(quarterTurns(540)).toBe(2);
+    expect(quarterTurns(45)).toBeNull();
+  });
+
+  test("uchyt sa otoci s prvkom", () => {
+    expect(turnHandle({ top: true }, 1)).toEqual({ right: true });
+    expect(turnHandle({ right: true, bottom: true }, 1)).toEqual({ bottom: true, left: true });
+    expect(turnHandle({ left: true }, 2)).toEqual({ right: true });
+    expect(turnHandle({ top: true, left: true }, 0)).toEqual({ top: true, left: true });
+  });
+
+  test("plocha na obrazovke ma pri neparnych stvrtinach vymenene rozmery okolo stredu", () => {
+    const box = { x: 100, y: 100, w: 200, h: 100 };
+    expect(turnBox(box, 2)).toEqual(box);
+    expect(turnBox(box, 1)).toEqual({ x: 150, y: 50, w: 100, h: 200 });
+    expect(turnBox(turnBox(box, 3), 3)).toEqual(box);
+    // zhoduje sa s obdlznikom okolo otocenej plochy
+    expect(turnBox(box, 1)).toEqual(boundsOf({ ...area, x: 100, y: 100, width: 200, height: 100, rotation: 90 }));
   });
 });

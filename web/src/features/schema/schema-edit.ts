@@ -253,3 +253,32 @@ export function resizeRotated(box: Box, rotation: number, handle: Handle, dx: nu
   const round = (value: number) => Math.round(value * 1000) / 1000;
   return { x: round(next.x + before.x - after.x), y: round(next.y + before.y - after.y), w: next.w, h: next.h };
 }
+
+/** Otocenie o cele stvrtiny kruhu: pocet stvrtin 0-3 v smere hodinovych ruciciek; null = sikme otocenie. */
+export function quarterTurns(rotation: number): number | null {
+  const turns = (((rotation % 360) + 360) % 360) / 90;
+  return Math.abs(turns - Math.round(turns)) < 1e-6 ? Math.round(turns) % 4 : null;
+}
+
+/** Uchyt prvku otoceneho o stvrtiny kruhu v osiach obrazovky: horny okraj je po jednej stvrtine vpravo atd. */
+export function turnHandle(handle: Handle, turns: number): Handle {
+  let turned = handle;
+  for (let i = 0; i < turns; i++) turned = { right: turned.top, bottom: turned.right, left: turned.bottom, top: turned.left };
+  const result: Handle = {};
+  if (turned.left) result.left = true;
+  if (turned.right) result.right = true;
+  if (turned.top) result.top = true;
+  if (turned.bottom) result.bottom = true;
+  return result;
+}
+
+/**
+ * Plocha prvku otoceneho o stvrtiny kruhu, ako lezi na obrazovke (pri neparnom pocte stvrtin sa vymeni sirka
+ * s vyskou okolo stredu). Prevod je sam sebe opacny - z plochy na obrazovke da plochu prvku.
+ */
+export function turnBox(box: Box, turns: number): Box {
+  if (turns % 2 === 0) return box;
+  const centerX = box.x + box.w / 2;
+  const centerY = box.y + box.h / 2;
+  return { x: centerX - box.h / 2, y: centerY - box.w / 2, w: box.h, h: box.w };
+}

@@ -45,6 +45,21 @@ public static class LineTools
         return McpMapper.ToStatus((await state.Handle(new GetStateQuery(), cancellationToken)).ValueOrThrow()).Lines.First(l => l.Number == number);
     }
 
+    [McpServerTool(Name = "set_line_outage", Title = "Line outage", ReadOnly = false, Destructive = false, Idempotent = true, OpenWorld = false,
+        UseStructuredContent = true)]
+    [Description("Simulates an outage of a line (outage = true) or ends it (outage = false): the connection with INISS is closed and a new one is "
+                 + "not accepted. The outage is not saved; a line in an outage of a running fault scenario stays in it while the scenario lasts.")]
+    [Authorize(Policy = Permissions.BoardsControl)]
+    public static async Task<DoneResult> SetLineOutage(
+        ICommandHandler<SetLineOutageCommand> handler,
+        [Description("Line number.")] int number,
+        [Description("true = outage, false = the line runs.")] bool outage,
+        CancellationToken cancellationToken = default)
+    {
+        (await handler.Handle(new SetLineOutageCommand(number, outage), cancellationToken)).ThrowIfFailed();
+        return new DoneResult(string.Create(CultureInfo.InvariantCulture, $"Line {number} outage is {(outage ? "on" : "off")}."));
+    }
+
     [McpServerTool(Name = "delete_line", Title = "Delete line", ReadOnly = false, Destructive = true, Idempotent = true, OpenWorld = false, UseStructuredContent = true)]
     [Description("Deletes a line together with all its boards.")]
     [Authorize(Policy = Permissions.LinesManage)]
