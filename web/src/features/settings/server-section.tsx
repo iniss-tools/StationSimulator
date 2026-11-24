@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { t } from "@/i18n";
 import { formatDateTime } from "@/lib/format";
+import { bugReportUrl, FEATURE_REQUEST_URL } from "@/lib/issues";
 import { useRestartServer } from "./use-restart-server";
 
 function PathRow({ label, path }: { label: string; path: string }) {
@@ -99,6 +100,15 @@ export function ServerSection({
             </dd>
           </>
         )}
+        <dt className="text-muted-foreground">{t("feedback.label")}</dt>
+        <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <a className="underline underline-offset-4" href={bugReportUrl(info?.version)} target="_blank" rel="noreferrer">
+            {t("feedback.bug")}
+          </a>
+          <a className="underline underline-offset-4" href={FEATURE_REQUEST_URL} target="_blank" rel="noreferrer">
+            {t("feedback.feature")}
+          </a>
+        </dd>
         {info && <PathRow label={t("server.dataFolder")} path={info.dataFolder} />}
         <PathRow label={t("server.database")} path={databasePath} />
       </dl>

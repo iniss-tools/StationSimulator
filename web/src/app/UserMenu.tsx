@@ -1,9 +1,10 @@
-// Pata bocneho panela: kto je prihlaseny a jeho ponuka - jazyk, vzhlad, systemove oznamenia, vlastne heslo, odhlasenie
-// (alebo kluc karty).
+// Pata bocneho panela: kto je prihlaseny a jeho ponuka - jazyk, vzhlad, systemove oznamenia, hlasenie chyb a navrhov,
+// vlastne heslo, odhlasenie (alebo kluc karty).
 import { useState } from "react";
-import { Bell, Cable, ChevronsUpDown, KeyRound, Languages, LogOut, Monitor, Moon, Sun, SunMoon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Bell, Bug, Cable, ChevronsUpDown, KeyRound, Languages, Lightbulb, LogOut, Monitor, Moon, Sun, SunMoon } from "lucide-react";
 import { toast } from "sonner";
-import { forgetAccessKey, logout, PERMISSIONS, queryClient, useCan, type MeDto } from "@/api";
+import { forgetAccessKey, getServerInfoOptions, logout, PERMISSIONS, queryClient, useCan, type MeDto } from "@/api";
 import { GrantsDialog } from "@/features/oauth/GrantsDialog";
 import { roleLabel } from "@/features/roles/roles";
 import { PasswordDialog } from "@/features/users/PasswordDialog";
@@ -24,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem, useSidebar } from "@/components/ui/sidebar";
 import { setLanguage, t, useLanguage, type Language } from "@/i18n";
+import { bugReportUrl, FEATURE_REQUEST_URL } from "@/lib/issues";
 import { setTheme, THEMES, useTheme, type Theme } from "@/lib/theme";
 import { notificationsSupported, setNotifications, useNotifications } from "./notifications";
 
@@ -49,6 +51,8 @@ export function UserMenu({ me }: { me: MeDto }) {
   const [passwordDone, setPasswordDone] = useState(false);
   const [grants, setGrants] = useState(false);
   const can = useCan();
+  // verziu servera vidi len sprava servera, ostatni ju do hlasenia dopisu
+  const version = useQuery({ ...getServerInfoOptions(), enabled: can([PERMISSIONS.settings, PERMISSIONS.server]) }).data?.version;
 
   // bez prihlasovania je kazdy na tomto pocitaci spravca; karta s klucom je zariadenie
   const name = me.accessKey ? t("user.device") : me.loginRequired ? me.displayName || me.userName || "" : t("user.local");
@@ -141,6 +145,15 @@ export function UserMenu({ me }: { me: MeDto }) {
                 </>
               ) : (
                 <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem render={<a href={bugReportUrl(version)} target="_blank" rel="noreferrer" />}>
+                    <Bug />
+                    {t("feedback.bug")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem render={<a href={FEATURE_REQUEST_URL} target="_blank" rel="noreferrer" />}>
+                    <Lightbulb />
+                    {t("feedback.feature")}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setGrants(true)}>
                     <Cable />
